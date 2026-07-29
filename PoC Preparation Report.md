@@ -690,3 +690,137 @@ Headless 홈페이지에서 다음 후보를 확인했다.
 이번 실험으로 홈페이지 root URL과 브라우저 실행 환경은 검증했다.
 그러나 첫 번째 DOM 후보는 실행 시점에 따라 항목 수가 달라지고 중복 sentinel이 관찰되므로,
 다음 단계에서 렌더링 안정화 시점과 실제 순위 데이터 경계를 추가로 확인해야 한다.
+
+## 14. Sprint 2-4 Top10 추출 규칙 검증
+
+Sprint 2-4에서는 운영 Collector를 작성하지 않고, 홈페이지의 실시간 검색어 영역을
+Headless와 Headed Chromium에서 반복 관찰했다.
+
+### 14.1 검증 조건
+
+- URL: `https://namu.wiki/`
+- root 후보: `ul.yKuNIpkC`
+- 렌더링 대기: root visible 확인 후 2초 대기
+- 반복 검증: Headless 새로고침 5회, Headed 새로고침 5회
+
+### 14.2 실제 DOM 캡처
+
+실제 실행에서 확인한 `root.outerHTML`의 구조적 발췌는 다음과 같다.
+`검색어`와 `...`는 중간 항목을 생략한 표기가 아니라 구조적 위치를 설명하기 위한 표기다.
+실제 텍스트와 href는 아래 표에 모두 기록한다.
+
+```html
+<ul data-v-ca9e9b6d="" class="yKuNIpkC">
+  <li data-v-ca9e9b6d="" class="aabxWUc+">
+    <a data-v-ca9e9b6d="" href="/Go?q=..." class="ntqH4deF" title="..." tabindex="-1">
+      <span data-v-ca9e9b6d="" class="HiABlndl">검색어</span>
+    </a>
+  </li>
+  <!-- 동일한 구조의 li가 반복됨 -->
+  <li data-v-ca9e9b6d="" class="aabxWUc+ NQ90pHJj">
+    <a data-v-ca9e9b6d="" href="/Go?q=첫 번째 검색어" class="ntqH4deF" title="첫 번째 검색어" tabindex="-1">
+      <span data-v-ca9e9b6d="" class="HiABlndl">첫 번째 검색어</span>
+    </a>
+  </li>
+</ul>
+```
+
+위 캡처에서 `검색어`는 DOM 구조를 설명하기 위한 표기이고, 실제 실행에서 확인한 항목은
+다음과 같다.
+
+| DOM 순서 | 실제 텍스트 |
+|---:|---|
+| 1 | 이동형 |
+| 2 | 황정민 |
+| 3 | 서킷브레이커 |
+| 4 | 유시은 |
+| 5 | 스파이더맨 브랜드 뉴 데이 |
+| 6 | 문근영 |
+| 7 | 고지용 |
+| 8 | 김용범 |
+| 9 | lck |
+| 10 | 최준용 |
+| 11 | 이동형 |
+
+### 14.3 항목과 sentinel 검증 결과
+
+상세 DOM 조사 결과:
+
+- root의 직접 자식은 모두 `LI`였다.
+- 직접 자식 `li` 개수는 11개였다.
+- 1~10번째 `li`와 11번째 `li` 모두 visible이었다.
+- 11번째 텍스트와 `href`는 1번째 항목과 같았다.
+- 11번째 `li`에는 `NQ90pHJj` 클래스가 추가되어 있었다.
+- 11번째 이후의 추가 노드는 없었다.
+- 확인한 반복 실행에서 sentinel은 항상 마지막 위치였다.
+- 확인한 반복 실행에서 sentinel은 항상 첫 번째 항목의 복제였다.
+
+반복 결과:
+
+| 실행 모드 | 반복 횟수 | 매 실행 `li` 수 | 숨김 `li` | 마지막 항목 복제 | sentinel 위치 |
+|---|---:|---:|---:|---|---|
+| Headless | 5회 | 모두 11개 | 모두 0개 | 모두 확인 | 모두 마지막 |
+| Headed | 5회 | 모두 11개 | 모두 0개 | 모두 확인 | 모두 마지막 |
+
+이 결과는 이번에 확인한 10회 실행에 대한 사실이다. 모든 실행과 모든 향후 페이지 상태에서
+동일하다고 일반화하지 않는다.
+
+### 14.4 Headed / Headless 차이
+
+이번 관찰 범위에서 Headed와 Headless의 다음 결과는 동일했다.
+
+- HTTP status: 200
+- root locator 선택
+- `li` 개수: 11개
+- hidden `li` 개수: 0개
+- 마지막 항목의 첫 항목 복제 여부
+- sentinel 위치
+
+따라서 현재 검증 결과만으로는 Headed와 Headless 사이의 DOM 차이를 확인하지 못했다.
+
+### 14.5 확정한 Top10 추출 규칙
+
+운영 Collector 구현 시 적용할 검증 규칙은 다음과 같다.
+
+1. `ul:has(> li > a[href^="/Go?q="])` 후보로 검색어 root를 선택한다.
+2. root의 직접 자식 `li`만 조회한다.
+3. 각 `li`가 visible인지 확인하고 hidden 항목은 제외한다.
+4. 항목이 11개이고 마지막 항목의 텍스트와 `href`가 첫 항목과 같으면 마지막 항목을 sentinel로 제외한다.
+5. sentinel을 제외한 항목이 정확히 10개인지 검증한다.
+6. DOM 순서대로 1~10의 `rank`를 부여한다.
+7. 위 조건을 만족하지 않으면 임의로 앞 10개를 사용하지 않고 추출 실패로 처리한다.
+
+요약하면 다음 순서다.
+
+    root 선택
+    ↓
+    직접 자식 li 조회
+    ↓
+    hidden 제외
+    ↓
+    마지막 항목이 첫 항목의 텍스트·href 복제인지 검증
+    ↓
+    복제 노드만 sentinel로 제외
+    ↓
+    정확히 10개인지 검증
+    ↓
+    DOM 순서로 rank 1~10 부여
+
+이 규칙은 `NQ90pHJj` 클래스만으로 sentinel을 판별하지 않는다.
+클래스는 보조 증거로 기록하되, 첫 항목과 마지막 항목의 텍스트·href 동일성과
+마지막 위치를 함께 검증한다.
+
+### 14.6 Sprint 2-4 판정
+
+- 실제 DOM 구조 확인: 성공
+- `li` 개수 확인: 성공
+- sentinel 존재 여부 확인: 성공
+- sentinel 위치 확인: 성공
+- sentinel의 첫 항목 복제 여부 확인: 성공
+- hidden 요소 확인: hidden `li` 없음
+- Top10 이후 추가 노드 확인: 없음
+- Headed / Headless 비교: 관찰 범위에서 차이 없음
+- 새로고침 후 규칙 유지: Headless 5회, Headed 5회에서 유지
+- 운영 Collector 구현: 수행하지 않음
+
+따라서 다음 Sprint부터는 위 규칙을 검증 실패를 숨기지 않는 방식으로 구현할 수 있다.
