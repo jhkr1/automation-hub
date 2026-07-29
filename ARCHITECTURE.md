@@ -736,3 +736,38 @@ keyword-title match는 trim 후 `casefold()`한 문자열 포함 여부만 확�
 관련성, 동명이인 구분, 다의어 해석, 기사의 실제 원인 여부를 판정하지 않습니다.
 따라서 `InsightQualityReport`는 품질 문제를 관찰하기 위한 진단 자료이며, 뉴스 검색
 알고리즘이나 Gemini Prompt의 품질을 자동으로 보증하는 평가 결과가 아닙니다.
+
+## 12. WSL 운영 구조
+
+namuwiki_trend의 WSL 운영 실행 경계는 저장소 루트의
+`run_namuwiki_trend.sh` Wrapper입니다.
+
+```text
+cron: 0 */3 * * *
+    ↓
+run_namuwiki_trend.sh
+    ↓
+.venv/bin/python -m namuwiki_trend.main
+    ↓
+output/trend_insights.json
+logs/namuwiki_trend.log
+```
+
+- cron은 Python 모듈을 직접 호출하지 않고 Wrapper만 호출함
+- Wrapper는 자신의 위치에서 저장소 루트를 계산하고 해당 위치로 이동함
+- 프로젝트의 `.venv/bin/python`을 사용함
+- `.env`를 자식 프로세스 환경에만 전달하며 secret을 출력하지 않음
+- 시작·종료 시각, 경과 시간, exit code를 로그에 기록함
+- `flock` 비배타 잠금으로 이전 실행이 끝나지 않았으면 중복 실행을 건너뜀
+- 로그와 JSON은 저장소의 `logs/`, `output/`에 두며 Git에서 무시함
+
+`0 */3 * * *`는 매일 3시간 간격으로 실행하는 cron 표현식입니다. cron 등록은 사용자의
+WSL crontab에 별도로 존재하며, WSL이 종료되면 cron도 실행되지 않습니다. Gemini 요청
+간격 제한으로 실행 시간이 약 2분까지 늘어날 수 있으므로 다음 예약 실행과 겹치지 않도록
+Wrapper의 `flock`을 유지합니다.
+
+운영 제한:
+
+- 이번 Sprint에서는 실제 3시간 대기를 하지 않음
+- WSL과 cron daemon의 부팅·상시 실행 여부는 운영 환경 책임임
+- quota 초과, 외부 사이트 장애와 Gemini 실패는 Wrapper exit code와 로그로 확인함

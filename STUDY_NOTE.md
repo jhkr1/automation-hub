@@ -11,6 +11,62 @@
 
 실제로 확인하지 못한 endpoint, payload, CSS selector와 HTML 세부 구조는 사실처럼 기록하지 않는다.
 
+## 향후 개편 목차
+
+현재 본문은 기존 조사 기록으로 유지하고, 다음 Sprint부터 아래 순서의 학습서 구조로 재배치한다.
+각 Part는 `왜 배우는가 → 무엇을 해결하는가 → 이 프로젝트에서 어디에 사용했는가` 순서로
+작성한다. 이 Sprint에서는 목차와 연결 규칙만 정의하며 본문은 추가하지 않는다.
+
+### Part 1. Python Backend
+
+- Python 문법과 타입
+- dataclass와 데이터 계약
+- 예외 처리와 의존성 주입
+- 프로젝트 적용: `models.py`, Provider, Application Layer
+
+### Part 2. Software Architecture
+
+- 계층 분리와 책임 경계
+- Composition Root와 Pipeline
+- Provider 교체 가능성
+- 프로젝트 적용: Collector → Enricher → Storage
+
+### Part 3. Web Crawling
+
+- HTTP와 HTML
+- View Source와 DOM
+- DevTools Network 분석
+- 브라우저 자동화와 Locator
+- 프로젝트 적용: Playwright Top10 Collector
+
+### Part 4. AI Integration
+
+- LLM Provider와 Prompt Builder
+- Grounding과 근거 제한
+- Rate Limiting과 Bounded Retry
+- 프로젝트 적용: Gemini reason 생성
+
+### Part 5. Testing
+
+- 순수 함수 테스트
+- Fake와 Dependency Injection
+- 계약 테스트와 Quality Diagnostics
+- Live Verification과 Unit Verification의 경계
+
+### Part 6. DevOps
+
+- 가상환경과 의존성 관리
+- Ruff, Pytest, Compileall Harness
+- Git Workflow
+- WSL, cron, Wrapper, flock, 로그 운영
+
+### Part 7. Case Study: namuwiki_trend
+
+- 문제 정의와 기술 조사
+- Sprint별 구현과 검증
+- 데이터 품질 문제와 진단
+- MVP 운영 구조와 Known Limitation
+
 # Chapter: 나무위키 실시간 검색어 분석
 
 ## 1. 문제 정의

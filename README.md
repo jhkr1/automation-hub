@@ -107,12 +107,57 @@ Free Tier quota는 프로젝트와 모델 조건에 따라 달라질 수 있습�
 현재 다음 기능은 구현되지 않았습니다.
 
 - `google_finance.main`
-- Scheduler와 Cron 설정
 - Cache
 - Database 저장
 - Batch 병렬화
 
 따라서 위 기능을 실행하는 명령이나 운영 절차는 제공하지 않습니다.
+
+## 운영 방법 (WSL Ubuntu)
+
+운영 실행 구조는 다음과 같습니다.
+
+```text
+cron (3시간마다)
+    ↓
+run_namuwiki_trend.sh
+    ↓
+python -m namuwiki_trend.main
+    ↓
+output/trend_insights.json
+    ↓
+logs/namuwiki_trend.log
+```
+
+Wrapper는 저장소 루트를 기준으로 `.venv/bin/python`을 사용하고, 실행 전용 환경변수
+`.env`를 자식 프로세스에만 전달합니다. API key와 credential은 로그에 기록하지 않습니다.
+
+수동 실행:
+
+```bash
+./run_namuwiki_trend.sh
+```
+
+cron 등록:
+
+```bash
+(crontab -l 2>/dev/null; echo "0 */3 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh") | crontab -
+crontab -l
+```
+
+`0 */3 * * *`는 매일 0분에 3시간 간격(00:00, 03:00, 06:00 …)으로 실행한다는 뜻입니다.
+실제 3시간을 기다리지 않고 `crontab -l`로 등록 상태를 확인합니다.
+
+cron 제거:
+
+```bash
+crontab -l | grep -v '/home/kstec/projects/automation-hub/run_namuwiki_trend.sh' | crontab -
+```
+
+출력은 `output/trend_insights.json`, 로그는 `logs/namuwiki_trend.log`에 저장됩니다.
+Wrapper는 `flock`으로 중복 실행을 방지합니다. Gemini 요청 간 최소 간격과 뉴스·브라우저·
+Gemini 호출 때문에 전체 실행은 약 2분이 걸릴 수 있으며, Free Tier quota와 WSL이 실행 중이어야
+합니다. WSL이 종료되면 Linux cron도 실행되지 않습니다.
 
 ## MVP 완료 기준
 
