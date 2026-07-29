@@ -250,8 +250,9 @@ Collector와 TrendEnricher를 연결하는 Top10 전체 Application Pipeline은 
 - **Verified**: `손흥민` 1건으로 Google News RSS 5건과 Gemini 응답을 연속 호출함
 - **Evidence**: Prompt에는 title/source/published_at만 포함되고 URL은 포함되지 않았으며, 응답 94자·전체 호출 시간 약 5.857초를 확인함
 - **Implemented**: `TrendEnricher`가 `TrendItem`과 뉴스 문맥·reason을 `TrendInsight`로 결합함
+- **Implemented**: `TrendPipeline`이 Collector의 목록을 순서대로 `TrendEnricher`에 전달함
 - **Rejected for now**: Prompt 기반 최신성 보강, CSV 스키마 변경,
-  Top10 전체 enrichment pipeline
+  전체 실행 Entry Point
 
 단위 테스트는 fake client로 검증합니다. 실제 Gemini 응답의 사실성·생성 품질은 뉴스 문맥의
 품질과 모델 응답에 의존하므로 Unit Test만으로 확정하지 않습니다.
@@ -455,11 +456,12 @@ TrendInsight
 - **Dependency Injection**: `TrendEnricher`는 Provider와 Generator를 생성자로 받아 테스트 대체 구현을 허용함
 - **Implemented**: `TrendEnricher.enrich(trend) -> TrendInsight`
 - **Implemented**: 뉴스 호출 limit 전달, 빈 기사 전달, reason trim·타입·빈 값·최대 300자 검증
-- **Not implemented**: Top10 batch, CSV 저장, Scheduler, retry, cache, CLI
+- **Not implemented**: TrendInsight 저장, Scheduler, retry, cache, CLI
 
 Known Limitation:
 
-- 현재 `TrendEnricher`는 한 번에 `TrendItem` 하나만 처리함
+- 현재 `TrendEnricher`는 한 번에 `TrendItem` 하나를 처리하고, `TrendPipeline`이 목록 순회를 담당함
+- `TrendPipeline`은 Top10 개수나 rank를 재검증하지 않으며 Collector 계약을 신뢰함
 - 빈 뉴스 목록도 오류로 보정하지 않고 Gemini에 전달함
 - 뉴스 기사의 핵심 주제 여부는 Prompt 지침에 의존하며 별도 분류기는 없음
 - `TrendInsight` 저장 형식과 장기 누적 정책은 아직 결정하지 않음
@@ -601,11 +603,11 @@ git diff --check
 
 ## 9. MVP Roadmap
 
-현재 MVP는 단일 `TrendItem` enrichment까지 구현되었으며, Top10 전체 실행과 결과 저장이
-남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
+현재 MVP는 단일 항목 enrichment와 Top10 Batch Orchestrator까지 구현되었으며, 실행 Entry
+Point와 결과 저장이 남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
 
-1. **Top10 Batch Orchestrator**: Collector의 `list[TrendItem]`을 순회하여
-   `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
+1. **완료: Top10 Batch Orchestrator**: `TrendPipeline`이 Collector의 `list[TrendItem]`을
+   순회하여 `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
 2. **Enriched Output Contract**: `TrendInsight`와 뉴스 목록을 보존할 출력 형식과 기존
    TrendItem CSV의 호환 정책을 결정함.
 3. **TrendInsight Storage**: 확정된 계약에 따라 Enriched 결과를 저장함.
