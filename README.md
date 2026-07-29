@@ -86,7 +86,7 @@ Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 �
 - `TrendPipeline`: Unit Verified
 - `JsonTrendInsightStorage`: Unit Verified
 - Application Entry Point: Unit Verified
-- 전체 Pipeline Live Verification: 미수행
+- 전체 Application Pipeline: Live Verified (2026-07-29)
 
 단일 Provider PoC는 다음 명령으로 직접 실행할 수 있습니다.
 
@@ -97,6 +97,8 @@ python -m namuwiki_trend.main
 ```
 
 앞의 두 명령은 개별 기술 검증용이며, 마지막 명령은 Collector부터 JSON 저장까지 실행합니다.
+전체 실행은 Gemini 요청 간격 제한의 영향으로 실행 시간이 늘어날 수 있으며,
+Free Tier quota는 프로젝트와 모델 조건에 따라 달라질 수 있습니다.
 
 ## Planned / Not Implemented
 
@@ -121,7 +123,7 @@ python -m namuwiki_trend.main
 - Enriched 결과 파일 저장
 - 단일 명령 실행
 - 외부 네트워크 없는 Unit Test
-- 실제 전체 Pipeline Live Verification 1회
+- 실제 전체 Pipeline Live Verification 1회 완료
 - `python scripts/verify.py` 통과
 
 ## Roadmap
@@ -132,6 +134,6 @@ python -m namuwiki_trend.main
 2. 완료: Enriched Output Contract
 3. 완료: `TrendInsight` Storage
 4. 완료: 단일 실행 Application Entry Point
-5. 전체 Pipeline Live Verification
+5. 완료: 전체 Pipeline Live Verification
 
 계층 책임과 상세 설계 결정은 [ARCHITECTURE.md](ARCHITECTURE.md)에 기록합니다.

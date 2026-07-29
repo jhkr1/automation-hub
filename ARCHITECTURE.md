@@ -633,7 +633,7 @@ git diff --check
 ## 9. MVP Roadmap
 
 현재 MVP는 단일 실행 Entry Point를 포함한 수집·enrichment·JSON 저장 흐름까지 구현되었으며,
-전체 Pipeline Live Verification이 남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
+전체 Pipeline Live Verification도 완료되었습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
 
 1. **완료: Top10 Batch Orchestrator**: `TrendPipeline`이 Collector의 `list[TrendItem]`을
    순회하여 `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
@@ -642,8 +642,9 @@ git diff --check
 3. **완료: TrendInsight Storage**: 확정된 JSON 계약에 따라 Enriched 결과를 저장함.
 4. **완료: Application Entry Point**: Collector, Batch Orchestrator, Storage를 단일 실행 명령으로
    연결함. Scheduler는 포함하지 않음.
-5. **전체 Pipeline Live Verification**: 실제 Top10 1회 실행으로 수집·뉴스·Gemini·저장을
-   검증함.
+5. **완료: 전체 Pipeline Live Verification**: 2026-07-29 실제 실행으로 수집·뉴스·Gemini·저장을
+   검증함. 실행 명령은 `python -m namuwiki_trend.main`, 기본 출력 경로는
+   `output/trend_insights.json`임.
 
 각 단계의 구현 전에는 실제 소비 요구와 실패 정책을 확인하며, 확인되지 않은 저장 형식이나
 운영 방식을 추측하여 선행 구현하지 않습니다.
@@ -704,5 +705,7 @@ git diff --check
 ### 10.3 Known Limitation
 
 - 파일은 overwrite되며 append·날짜별 보관·장기 누적은 구현하지 않음
-- 전체 Pipeline의 실제 네트워크·Gemini·파일 저장을 한 번에 검증하는 Live 실행은 아직 없음
+- Gemini 요청 간 최소 간격으로 전체 실행 시간이 늘어날 수 있음
+- Free Tier quota는 프로젝트·모델 조건에 따라 달라지며, quota 초과 시 bounded retry 후 실패할 수 있음
+- 2026-07-29 Live 실행 stdout에서는 429 retry 발생을 확인하지 못함
 - JSON schema migration과 backward compatibility는 `schema_version`만 정의된 상태임
