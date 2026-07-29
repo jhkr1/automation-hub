@@ -1,8 +1,12 @@
 """Gemini를 사용한 나무위키 실시간 검색어 등재 이유 생성."""
 
 import os
+import re
+import time
+from collections.abc import Callable
 
 from google import genai
+from google.genai import errors
 
 from namuwiki_trend.models import NewsArticle, TrendItem
 
@@ -11,6 +15,11 @@ GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 MAX_REASON_LENGTH = 300
 MAX_PROMPT_LENGTH = 12_000
 INSUFFICIENT_EVIDENCE_REASON = "제공된 기사만으로는 정확한 이유를 확인하기 어렵다."
+DEFAULT_MIN_REQUEST_INTERVAL_SECONDS = 12.0
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+Clock = Callable[[], float]
+Sleeper = Callable[[float], None]
 
 
 def build_reason_prompt(trend: TrendItem, articles: list[NewsArticle]) -> str:
@@ -80,9 +89,20 @@ class GeminiReasonGenerator:
         client: genai.Client | None = None,
         *,
         model: str = DEFAULT_MODEL,
+        min_request_interval_seconds: float = DEFAULT_MIN_REQUEST_INTERVAL_SECONDS,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
+        clock: Clock = time.monotonic,
+        sleeper: Sleeper = time.sleep,
     ) -> None:
         if not model:
             raise ValueError("Gemini model이 비어 있음")
+        if min_request_interval_seconds < 0:
+            raise ValueError("min_request_interval_seconds는 0 이상이어야 함")
+        if type(max_retries) is not int or max_retries < 0:
+            raise ValueError("max_retries는 0 이상의 정수여야 함")
+        if retry_backoff_seconds <= 0:
+            raise ValueError("retry_backoff_seconds는 양수여야 함")
 
         if client is None:
             api_key = os.getenv(GEMINI_API_KEY_ENV)
@@ -92,14 +112,68 @@ class GeminiReasonGenerator:
 
         self._client = client
         self._model = model
+        self._min_request_interval_seconds = min_request_interval_seconds
+        self._max_retries = max_retries
+        self._retry_backoff_seconds = retry_backoff_seconds
+        self._clock = clock
+        self._sleeper = sleeper
+        self._last_request_at: float | None = None
+
+    def _wait_for_request_interval(self) -> None:
+        """직전 Gemini 요청 이후 최소 간격이 지나도록 대기한다."""
+        now = self._clock()
+        if self._last_request_at is not None:
+            remaining = self._min_request_interval_seconds - (now - self._last_request_at)
+            if remaining > 0:
+                self._sleeper(remaining)
+        self._last_request_at = self._clock()
+
+    @staticmethod
+    def _retry_delay_seconds(error: errors.ClientError) -> float | None:
+        """SDK 오류의 RetryInfo retryDelay를 초 단위로 읽는다."""
+        details = error.details
+        if not isinstance(details, dict):
+            return None
+        error_body = details.get("error", {})
+        if not isinstance(error_body, dict):
+            return None
+        error_details = error_body.get("details", [])
+        if not isinstance(error_details, list):
+            return None
+        for detail in error_details:
+            if not isinstance(detail, dict):
+                continue
+            if detail.get("@type", "").endswith("RetryInfo"):
+                retry_delay = detail.get("retryDelay")
+                if isinstance(retry_delay, str):
+                    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)s", retry_delay)
+                    if match:
+                        return float(match.group(1))
+        return None
+
+    def _generate_content(self, prompt: str) -> object:
+        """Rate limit과 제한된 quota retry를 적용해 SDK를 호출한다."""
+        for retry_index in range(self._max_retries + 1):
+            self._wait_for_request_interval()
+            try:
+                return self._client.models.generate_content(
+                    model=self._model,
+                    contents=prompt,
+                )
+            except errors.ClientError as exc:
+                is_quota_error = exc.code == 429 and exc.status == "RESOURCE_EXHAUSTED"
+                if not is_quota_error or retry_index == self._max_retries:
+                    raise
+                delay = self._retry_delay_seconds(exc)
+                if delay is None:
+                    delay = self._retry_backoff_seconds * (2**retry_index)
+                self._sleeper(delay)
+        raise AssertionError("unreachable")
 
     def generate_reason(self, trend: TrendItem, articles: list[NewsArticle]) -> str:
         """TrendItem과 뉴스 문맥에 대한 짧은 설명을 생성한다."""
         prompt = build_reason_prompt(trend, articles)
-        response = self._client.models.generate_content(
-            model=self._model,
-            contents=prompt,
-        )
+        response = self._generate_content(prompt)
 
         if response is None:
             raise RuntimeError("Gemini 응답 객체가 없음")

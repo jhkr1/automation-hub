@@ -387,6 +387,11 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
   `client.models.generate_content()` 사용
 - **Implemented**: 공식 model identifier `gemini-3.5-flash`를 `DEFAULT_MODEL` 한 곳에서 관리함
 - **Implemented**: `GEMINI_API_KEY` 환경 변수를 사용하며 코드에 key를 저장하지 않음
+- **Implemented**: `GeminiReasonGenerator`가 요청 간 최소 간격을 적용함
+- **Implemented**: `429 RESOURCE_EXHAUSTED`에만 최대 재시도 횟수 내에서 retry함
+- **Implemented**: SDK `ClientError.details`의 Google RPC `RetryInfo.retryDelay`를 우선 사용하고,
+  값이 없거나 파싱되지 않으면 bounded exponential backoff를 사용함
+- **Implemented**: 테스트에서 실제 대기를 하지 않도록 clock과 sleeper를 주입할 수 있음
 - **Reconsider when**: 두 번째 Provider가 실제로 추가될 때 공통 Protocol 또는 최소 인터페이스를
   코드로 도입함
 - **Rejected for now**: Provider가 하나뿐인 단계에서 abstract base class, DI container,
@@ -454,6 +459,10 @@ rank,keyword,href
 - `TrendItem` 원본 결과가 LLM 실패로 손상되지 않는지
 - 생성된 reason이 1~2줄 요구를 만족하는지
 - 실제 API 호출 테스트와 네트워크 비의존 테스트의 경계를 어떻게 나누는지
+
+Gemini 호출 계층의 rate limiting과 retry는 `GeminiReasonGenerator` 내부 책임입니다.
+`TrendPipeline`에는 sleep이나 Gemini-specific 예외 처리를 넣지 않습니다. 429가 아닌 SDK
+예외는 즉시 호출자에게 전달하며, retry 횟수는 생성자 설정으로 제한합니다.
 
 ### 6.9 Trend Enrichment Application Layer
 

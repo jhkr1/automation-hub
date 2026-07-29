@@ -14,6 +14,7 @@ Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프�
 - `NewsArticle` 모델
 - 뉴스 문맥을 사용하는 Gemini Prompt grounding
 - Gemini `gemini-3.5-flash` 기반 reason 생성
+- Gemini 호출 최소 간격 제한과 429 `RESOURCE_EXHAUSTED` bounded retry
 - 단일 `TrendItem` enrichment와 `TrendInsight` 생성
 - `TrendPipeline` 기반 Top10 목록 enrichment orchestration
 - `TrendInsight` JSON 저장
@@ -103,7 +104,7 @@ python -m namuwiki_trend.main
 
 - `google_finance.main`
 - Scheduler와 Cron 설정
-- Retry와 Cache
+- Cache
 - Database 저장
 - Batch 병렬화
 

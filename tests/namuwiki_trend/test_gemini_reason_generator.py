@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from google.genai import errors
 
 from namuwiki_trend.gemini_reason_generator import (
     DEFAULT_MODEL,
@@ -169,3 +170,124 @@ def test_generate_reason_rejects_excessively_long_response() -> None:
 
     with pytest.raises(ValueError, match="최대 길이를 초과함"):
         generator.generate_reason(_trend(), [])
+
+
+def _quota_error(
+    *, retry_delay: str | None = None, status: str = "RESOURCE_EXHAUSTED"
+) -> errors.ClientError:
+    """테스트용 Gemini quota 오류를 만든다."""
+    details = []
+    if retry_delay is not None:
+        details.append(
+            {
+                "@type": "type.googleapis.com/google.rpc.RetryInfo",
+                "retryDelay": retry_delay,
+            }
+        )
+    return errors.ClientError(
+        429,
+        {"error": {"status": status, "details": details}},
+    )
+
+
+class SequencedModels:
+    """호출마다 사전 정의된 오류 또는 응답을 반환하는 Fake 모델."""
+
+    def __init__(self, outcomes: list[object]) -> None:
+        self.outcomes = outcomes
+        self.calls = 0
+
+    def generate_content(self, *, model: str, contents: str) -> object:
+        """다음 결과를 반환한다."""
+        self.calls += 1
+        outcome = self.outcomes[min(self.calls - 1, len(self.outcomes) - 1)]
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def test_generate_reason_enforces_minimum_request_interval() -> None:
+    """연속 요청 사이에 설정한 최소 간격만큼 sleeper를 호출한다."""
+    current_time = 0.0
+    sleeps: list[float] = []
+    models = SequencedModels([SimpleNamespace(text="첫 응답"), SimpleNamespace(text="둘째 응답")])
+    client = SimpleNamespace(models=models)
+
+    def clock() -> float:
+        return current_time
+
+    def sleeper(delay: float) -> None:
+        nonlocal current_time
+        sleeps.append(delay)
+        current_time += delay
+
+    generator = GeminiReasonGenerator(
+        client=client,
+        min_request_interval_seconds=5.0,
+        clock=clock,
+        sleeper=sleeper,
+    )
+
+    generator.generate_reason(_trend(), [])
+    generator.generate_reason(_trend(), [])
+
+    assert models.calls == 2
+    assert sleeps == [5.0]
+
+
+def test_generate_reason_retries_only_resource_exhausted_and_uses_retry_delay() -> None:
+    """429 RESOURCE_EXHAUSTED만 retry하고 응답의 retryDelay를 사용한다."""
+    sleeps: list[float] = []
+    models = SequencedModels(
+        [_quota_error(retry_delay="3.5s"), SimpleNamespace(text="재시도 성공")]
+    )
+    generator = GeminiReasonGenerator(
+        client=SimpleNamespace(models=models),
+        min_request_interval_seconds=0,
+        sleeper=sleeps.append,
+    )
+
+    assert generator.generate_reason(_trend(), []) == "재시도 성공"
+    assert models.calls == 2
+    assert sleeps == [3.5]
+
+
+def test_generate_reason_uses_bounded_exponential_retry_when_delay_missing() -> None:
+    """retryDelay가 없으면 bounded exponential backoff를 사용한다."""
+    error = _quota_error()
+    sleeps: list[float] = []
+    models = SequencedModels([error])
+    generator = GeminiReasonGenerator(
+        client=SimpleNamespace(models=models),
+        min_request_interval_seconds=0,
+        max_retries=2,
+        retry_backoff_seconds=2.0,
+        sleeper=sleeps.append,
+    )
+
+    with pytest.raises(errors.ClientError) as raised:
+        generator.generate_reason(_trend(), [])
+
+    assert raised.value is error
+    assert models.calls == 3
+    assert sleeps == [2.0, 4.0]
+
+
+@pytest.mark.parametrize(
+    "error", [_quota_error(status="INVALID_ARGUMENT"), errors.ClientError(400, {})]
+)
+def test_generate_reason_does_not_retry_other_sdk_errors(error: errors.ClientError) -> None:
+    """429가 아니거나 RESOURCE_EXHAUSTED가 아니면 즉시 전달한다."""
+    sleeps: list[float] = []
+    models = SequencedModels([error])
+    generator = GeminiReasonGenerator(
+        client=SimpleNamespace(models=models),
+        sleeper=sleeps.append,
+    )
+
+    with pytest.raises(errors.ClientError) as raised:
+        generator.generate_reason(_trend(), [])
+
+    assert raised.value is error
+    assert models.calls == 1
+    assert sleeps == []
