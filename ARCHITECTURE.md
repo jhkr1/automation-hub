@@ -219,3 +219,198 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 - **Reconsider when**: Playwright의 브라우저 실행 시간·메모리·Linux 시스템 의존성이 운영 제약을 초과함
 
 위 조건이 발생하면 Selenium 또는 requests 기반 방식을 새 Evidence로 검증한 후 재결정합니다.
+
+## 6. LLM Enrichment Layer (Planned)
+
+### 6.1 목표와 현재 상태
+
+현재 수집 파이프라인은 다음과 같습니다.
+
+    Playwright Collector
+    ↓
+    list[TrendItem]
+    ↓
+    CSV 저장
+
+다음 단계에서는 각 검색어가 왜 실시간 검색어인지 1~2줄로 설명하는 LLM 생성 계층을
+추가할 수 있습니다.
+
+- **Implemented**: Collector는 `list[TrendItem]`만 반환함
+- **Implemented**: CSV 저장은 `TrendItem`만 입력으로 받음
+- **Planned**: `TrendItem`을 설명 결과와 결합하는 LLM Enrichment Layer
+- **Planned**: Gemini Flash 기반 첫 Provider 검토
+- **Rejected for now**: 이번 Sprint의 Gemini API 호출, API Key 사용, 뉴스 검색, Prompt 테스트,
+  CSV 스키마 변경
+
+이번 기록은 설계안이며 실제 Gemini API 호출이나 생성 품질을 검증한 결과가 아닙니다.
+
+### 6.2 모델 경계 검토
+
+두 가지 모델 방식을 검토합니다.
+
+#### 대안 A: TrendItem에 reason 필드 추가
+
+```text
+TrendItem
+- rank
+- keyword
+- href
+- reason
+```
+
+장점은 결과가 단일 객체에 모이고 직렬화가 단순하다는 점입니다. 단점은 Collector가
+LLM 결과가 있는 객체를 알게 되고, `TrendItem`의 원시 수집 계약과 CSV 저장 계약이 변경됩니다.
+LLM 실패나 재생성 상태를 원시 수집 결과와 함께 다루기도 어려워집니다.
+
+#### 대안 B: TrendInsight wrapper
+
+```text
+TrendInsight
+- trend: TrendItem
+- reason: str
+```
+
+장점은 Collector와 기존 CSV가 `TrendItem` 계약을 그대로 유지하고, LLM 결과가 선택적
+Enrichment 결과임을 명확히 표현할 수 있다는 점입니다. 단점은 저장·출력 시 wrapper를
+변환하는 단계가 추가됩니다.
+
+현재는 대안 B를 선택합니다.
+
+- **현재 선택**: `TrendItem`은 수집 원본으로 유지하고, `TrendInsight`를 별도 결과로 둠
+- **근거**: Collector와 CSV 저장의 책임을 변경하지 않고 LLM 계층을 추가할 수 있음
+- **Reconsider when**: 모든 소비자가 항상 설명을 요구하고 원시 TrendItem 계약을 변경해도
+  호환성 문제가 없다는 Evidence가 확인되면 단일 모델 통합을 재검토함
+
+이번 Sprint에서는 `TrendInsight` 클래스를 구현하지 않습니다.
+
+### 6.3 LLM 계층 책임과 데이터 흐름
+
+계획하는 책임 분리는 다음과 같습니다.
+
+    Collector
+    ↓ list[TrendItem]
+    Reason Generator
+    ↓
+    LLM Provider
+    ↓ reason
+    TrendInsight 생성
+
+- `collector.py`: 브라우저 수집과 순위 검증만 담당함
+- `extraction.py`: sentinel, 개수, keyword/href, rank 규칙만 담당함
+- `csv_storage.py`: 현재 `TrendItem` 원본을 CSV로 직렬화함
+- Reason Generator: TrendItem을 설명 생성 입력으로 변환하고 결과를 TrendInsight와 결합함
+- Gemini Provider: Gemini API 호출과 응답 처리를 담당함
+- `TrendInsight`: 원본 TrendItem과 생성된 reason을 함께 표현함
+
+Collector가 Gemini Provider를 직접 호출하지 않도록 합니다.
+
+### 6.4 Provider Interface 검토
+
+다음 인터페이스를 비교합니다.
+
+#### 키워드만 전달
+
+```python
+generate_reason(keyword: str) -> str
+```
+
+단순하고 Provider 구현이 쉽지만 `rank`, `href`와 같은 검증된 TrendItem 문맥을 잃습니다.
+향후 뉴스 제목 등 추가 입력을 연결할 때 별도 확장이 필요합니다.
+
+#### TrendItem 전달
+
+```python
+generate_reason(trend: TrendItem) -> str
+```
+
+Collector의 원본 계약을 보존하면서 Provider가 필요한 keyword를 사용하고 rank와 href를
+결과에 연결하기 쉽습니다. 다만 현재 시그니처만으로는 뉴스 제목 같은 외부 문맥을 직접
+전달하지 않습니다.
+
+#### 목록을 한 번에 전달
+
+```python
+generate_reasons(trends: list[TrendItem]) -> list[str]
+```
+
+API 호출 수나 batch 처리 효율을 검토하기 쉽지만, 한 항목 실패가 전체 결과에 영향을 줄 수
+있고 항목별 재시도·검증·오류 추적이 복잡해질 수 있습니다.
+
+#### 현재 계획
+
+MVP Provider 경계는 다음 동기 메서드로 설계합니다.
+
+```python
+generate_reason(trend: TrendItem) -> str
+```
+
+Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합합니다. batch API가
+필요하다는 실제 비용 Evidence가 생기면 목록 단위 메서드를 별도로 검토합니다.
+
+### 6.5 Provider 교체 가능성
+
+현재 첫 Provider 후보는 Gemini Flash입니다. 향후 OpenAI, Claude, 로컬 LLM으로 교체할 수
+있도록 상위 계층은 `generate_reason(trend)`라는 동작 계약만 사용하도록 합니다.
+
+- **Planned**: Gemini Provider는 API 호출과 Provider별 요청·응답 형식을 캡슐화함
+- **Reconsider when**: 두 번째 Provider가 실제로 추가될 때 공통 Protocol 또는 최소 인터페이스를
+  코드로 도입함
+- **Rejected for now**: Provider가 하나뿐인 단계에서 abstract base class, DI container,
+  factory registry를 미리 만들지 않음
+
+이 판단은 추상화를 거부하는 것이 아니라 현재 구현 규모와 실제 교체 요구가 확인되지 않은
+상태에서 복잡도를 제한하는 선택입니다.
+
+### 6.6 Prompt 설계 방향
+
+이번 Sprint에서는 Prompt를 실행하거나 테스트하지 않습니다. 설계상 최소 입력은 검색어입니다.
+
+```text
+검색어: {keyword}
+
+이 검색어가 현재 실시간 검색어 순위에 오른 가능한 이유를
+확인된 사실과 추론을 구분하여 한국어 1~2문장으로 설명하라.
+확인하지 못한 사건이나 수치를 사실처럼 만들지 마라.
+```
+
+향후 뉴스 제목을 사용할 필요가 생기면 Prompt에 선택적 `news_titles` 문맥을 추가할 수
+있습니다. 다만 뉴스 검색과 LLM 생성의 책임을 합치지 않고, 입력 문맥을 명시적으로 전달하는
+구조를 유지합니다.
+
+- **Verified**: 현재 Collector가 제공하는 확정 입력은 `TrendItem.keyword`임
+- **Planned**: 뉴스 제목을 포함한 확장 Prompt
+- **Rejected for now**: 확인되지 않은 뉴스나 API 응답을 Prompt에 자동으로 추가함
+
+### 6.7 CSV 영향 범위
+
+현재 CSV 스키마는 다음과 같습니다.
+
+```text
+rank,keyword,href
+```
+
+`reason`을 기존 CSV에 바로 추가하면 기존 파일 소비자와 헤더 계약이 변경됩니다. 따라서
+다음 두 방식을 비교합니다.
+
+- 기존 CSV에 `reason` 컬럼 추가: 한 파일에서 완성 결과를 소비하기 쉽지만 원본 저장 계약과
+  LLM 생성 결과가 결합되고, 생성 실패·재생성 상태를 다루기 어려움
+- Enrichment 결과를 별도 CSV로 저장: 기존 원본 CSV 호환성을 유지하지만 두 결과를 연결할
+  키와 파일 관리 규칙이 필요함
+
+현재는 기존 CSV를 변경하지 않습니다.
+
+- **Implemented**: 원본 CSV는 `rank,keyword,href` 유지
+- **Planned**: LLM 구현 Sprint에서 `reason` 저장 위치와 스키마를 별도 결정
+- **Reconsider when**: 실제 소비자가 원본과 설명을 항상 함께 요구하는지, LLM 실패를 어떻게
+  표현할지 확인된 후 컬럼 추가 또는 별도 파일을 결정함
+
+### 6.8 다음 구현 Sprint의 검증 조건
+
+다음 Sprint에서 Gemini를 연결할 때 다음을 별도로 검증해야 합니다.
+
+- API Key를 코드나 로그에 노출하지 않는지
+- Gemini Provider가 Collector와 분리되어 있는지
+- 빈 응답, API 오류, 과도한 응답, 근거 없는 설명을 어떻게 처리하는지
+- `TrendItem` 원본 결과가 LLM 실패로 손상되지 않는지
+- 생성된 reason이 1~2줄 요구를 만족하는지
+- 실제 API 호출 테스트와 네트워크 비의존 테스트의 경계를 어떻게 나누는지
