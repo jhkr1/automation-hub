@@ -429,3 +429,111 @@ rank,keyword,href
 - [Gemini API 시작하기](https://ai.google.dev/gemini-api/docs/generate-content/get-started)
 - [Gemini 3.5 Flash 모델 ID](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.5)
 - [Gemini API Key 사용](https://ai.google.dev/gemini-api/docs/generate-content/api-key)
+
+## 7. 최신 뉴스 문맥 Provider PoC
+
+### 7.1 해결하려는 문제
+
+`TrendItem.keyword`만으로는 검색어가 실시간 검색어 순위에 오른 최신 사건을 확인하기
+어렵습니다. 이번 단계의 범위는 검색어 하나에 대한 최신 뉴스 제목·URL·출처·게시 시각을
+가져올 수 있는지 검증하는 것이며, Gemini enrichment와의 연결은 포함하지 않습니다.
+
+### 7.2 검토한 후보
+
+| 후보 | 장점 | 단점 및 확인 상태 |
+|---|---|---|
+| Google News RSS 검색 | API Key 없이 검색어별 XML을 받을 수 있고, 한국어 locale 파라미터와 title/link/source/pubDate 필드를 다루기 쉬움 | Google이 안정적인 소비자 검색 API로 명시한 공식 RSS 사양은 확인하지 못함. feed URL과 결과 범위의 장기 안정성·호출 제한은 `확인하지 못함` |
+| 네이버 뉴스 검색 API | 한국어 검색에 맞는 공식 검색 API 후보이며 구조화된 JSON 응답을 사용할 수 있음 | 개발자 애플리케이션 등록과 Client ID/Secret 관리가 필요함. 현재 프로젝트에서 실제 발급 키·한도·Live 응답은 `확인하지 못함` |
+| 개별 언론사 RSS | API Key 없이 접근할 수 있고 특정 출처의 원문 feed를 사용할 수 있음 | 검색어 통합 검색이 아니며 출처마다 필드·갱신 주기·약관이 달라 공통 Provider로 사용하기 어려움 |
+| 뉴스 HTML 브라우저 수집 | 화면에서 보이는 검색 결과를 직접 확인할 수 있음 | DOM 변경·접근 제한·약관 검토 비용이 커서 API/RSS가 불가능할 때만 검토함 |
+
+네이버 검색 API는 [공식 뉴스 검색 문서](https://developers.naver.com/docs/serviceapi/search/news)에서
+제공되는 후보로 확인했습니다. Google News는 [Publisher Center 안내](https://support.google.com/news/publisher-center/answer/15898024)
+에서 Publisher Center 제출 RSS/web location 흐름이 변경되었다고 안내하므로, 이번 구현의
+Google News RSS 주소를 공식적인 안정 API 계약으로 해석하지 않습니다.
+
+### 7.3 최종 선택과 이유
+
+이번 PoC에서는 Google News RSS 검색을 선택했습니다.
+
+- **선택 이유**: API Key 없이 검색어 하나의 최신 문맥을 요청할 수 있어 현재 PoC의 인증·비밀정보 범위를 늘리지 않음
+- **한국어 처리**: `hl=ko`, `gl=KR`, `ceid=KR:ko`를 요청 URL에 포함함
+- **테스트성**: XML parser를 순수 함수로 분리하고 HTTP client를 주입할 수 있음
+- **비용**: 이미 설치된 `requests`와 Python 표준 XML parser만 사용하며 새 의존성을 추가하지 않음
+- **Verified**: RSS XML 파싱, trim, 필수 필드, URL, 출처, 게시 시각, 중복 제거, limit을 Unit Test로 검증함
+- **Live Verified**: 이 Commit에서는 자동 또는 수동 Live 호출을 실행하지 않음
+
+이는 Google News RSS가 장기 운영에 절대적으로 적합하다는 의미가 아닙니다. 현재 목표인
+키워드 하나의 뉴스 문맥 확보 PoC에 대한 선택이며, 공개 feed의 계약·호출 제한·결과 품질은
+운영 전 추가 검증이 필요합니다.
+
+### 7.4 데이터 흐름
+
+```text
+keyword: str
+    ↓ trim 및 입력 검증
+NewsContextProvider.search(keyword, limit)
+    ↓ Google News RSS 검색 URL
+주입된 HTTP client
+    ↓ bytes XML
+parse_google_news_rss()
+    ↓ URL 중복 제거 및 limit 적용
+list[NewsArticle]
+```
+
+`NewsArticle`은 다음 필드를 보존합니다.
+
+```text
+title: str
+url: str
+source: str | None
+published_at: datetime | None
+```
+
+title과 HTTP(S) 절대 URL은 필수입니다. source와 pubDate가 없거나 pubDate를 해석할 수
+없으면 선택 필드를 `None`으로 둡니다. 같은 URL은 최초 항목만 보존하고, 중복 제거 후
+앞에서부터 `limit`개를 반환합니다. HTTP 예외는 원인 보존을 위해 그대로 전달합니다.
+
+### 7.5 구현 범위와 실행 방법
+
+- **Implemented**: `models.py`에 뉴스 문맥용 `NewsArticle` 모델 추가
+- **Implemented**: `news_context_provider.py`의 `NewsContextProvider.search()`와 순수 RSS parser
+- **Implemented**: `news_context_poc.py`에 검색어 `손흥민` 하나를 조회하는 수동 실행 경로 추가
+- **Not changed**: Collector, 기존 CSV, Gemini Provider, TrendInsight, CLI, Scheduler
+- **Not implemented**: retry, cache, batch 처리, 브라우저 HTML 수집
+
+Live 확인은 자동 테스트에 포함하지 않습니다. 사용자가 직접 다음 명령을 실행합니다.
+
+```bash
+python -m namuwiki_trend.news_context_poc
+```
+
+스크립트는 결과 개수, 제목, 출처, 게시 시각, URL, 호출 시간을 출력합니다. 이 명령을
+실행하지 않은 상태에서는 Live Verified로 기록하지 않습니다.
+
+### 7.6 알려진 한계와 재검토 조건
+
+- Google News RSS의 공개 feed URL은 공식 소비자 검색 API 계약으로 확인되지 않았습니다.
+- 검색 결과가 나무위키 실시간 검색어의 실제 등재 원인을 증명하지는 않습니다.
+- 결과의 순위·완전성·최신성은 Google News의 수집·정렬 정책에 의존합니다.
+- source와 게시 시각은 feed 항목에 없거나 형식이 달라질 수 있습니다.
+- 호출 제한, 장애율, 장기 URL 안정성은 Live 반복 실험 전까지 `확인하지 못함`입니다.
+- 네이버 API 키를 확보하고 공식 한도·한국어 결과 품질을 실제로 비교할 수 있게 되면 재검토합니다.
+- Google RSS 계약 변경, 빈 결과 증가, HTTP 차단 또는 운영 SLA 요구가 확인되면 네이버 API,
+  출처별 RSS, 승인된 다른 뉴스 API를 새 Evidence로 비교합니다.
+
+### 7.7 향후 Gemini 연결 계획
+
+다음 단계에서 `list[NewsArticle]`를 근거 문맥으로 Reason Generator에 선택적으로 전달할 수
+있습니다. 뉴스 Provider는 Collector를 호출하지 않으며, Gemini Provider도 뉴스 검색을
+직접 수행하지 않습니다. 실제 연결 전에는 기사 제목을 사실의 증거로 사용할 범위, 출처·시각
+표시, 뉴스가 없을 때의 응답, LLM 생성 품질을 별도 테스트해야 합니다.
+
+검증 명령:
+
+```bash
+ruff check .
+pytest -q
+python -m compileall namuwiki_trend tests
+git diff --check
+```

@@ -28,12 +28,12 @@ class TrendKeyword:
 
 @dataclass
 class NewsArticle:
-    """네이버 뉴스 검색 결과 1건."""
+    """뉴스 문맥 검색 결과 1건."""
 
     title: str
-    summary: str
-    link: str
-    pub_date: datetime
+    url: str
+    source: str | None = None
+    published_at: datetime | None = None
 
 
 @dataclass
