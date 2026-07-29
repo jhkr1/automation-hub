@@ -232,21 +232,23 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
     ↓
     CSV 저장
 
-다음 단계에서는 각 검색어가 왜 실시간 검색어인지 1~2줄로 설명하는 LLM 생성 계층을
-추가할 수 있습니다.
+현재 단계에서는 각 검색어와 최신 뉴스 문맥을 근거로 왜 실시간 검색어인지 1~2줄로
+설명하는 LLM 생성 계층을 검증합니다.
 
 - **Implemented**: Collector는 `list[TrendItem]`만 반환함
 - **Implemented**: CSV 저장은 `TrendItem`만 입력으로 받음
 - **Implemented**: `gemini_reason_generator.py`의 `GeminiReasonGenerator` 구현
-- **Implemented**: Provider 공개 API `generate_reason(trend: TrendItem) -> str`
+- **Implemented**: Provider 공개 API `generate_reason(trend: TrendItem, articles: list[NewsArticle]) -> str`
 - **Implemented**: Gemini API 호출, 응답 text 검증, 최대 300자 검증
+- **Implemented**: `build_reason_prompt()`의 뉴스 문맥 grounding과 URL 제외
+- **Verified**: `손흥민` 1건으로 Google News RSS 5건과 Gemini 응답을 연속 호출함
+- **Evidence**: Prompt에는 title/source/published_at만 포함되고 URL은 포함되지 않았으며, 응답 94자·전체 호출 시간 약 5.857초를 확인함
 - **Planned**: `TrendItem`을 설명 결과와 결합하는 LLM Enrichment Layer
-- **Planned**: Gemini API Live 검증
-- **Rejected for now**: 뉴스 검색, Prompt 기반 최신성 보강, CSV 스키마 변경,
+- **Rejected for now**: Prompt 기반 최신성 보강, CSV 스키마 변경,
   Top10 전체 enrichment pipeline
 
-단위 테스트는 fake client로 검증했지만, 현재 환경에 `GEMINI_API_KEY`가 없어 실제 Gemini API
-호출과 생성 품질은 `확인하지 못함`으로 기록합니다.
+단위 테스트는 fake client로 검증합니다. 실제 Gemini 응답의 사실성·생성 품질은 뉴스 문맥의
+품질과 모델 응답에 의존하므로 Unit Test만으로 확정하지 않습니다.
 
 ### 6.2 모델 경계 검토
 
@@ -321,15 +323,14 @@ generate_reason(keyword: str) -> str
 단순하고 Provider 구현이 쉽지만 `rank`, `href`와 같은 검증된 TrendItem 문맥을 잃습니다.
 향후 뉴스 제목 등 추가 입력을 연결할 때 별도 확장이 필요합니다.
 
-#### TrendItem 전달
+#### TrendItem과 뉴스 문맥 전달
 
 ```python
-generate_reason(trend: TrendItem) -> str
+generate_reason(trend: TrendItem, articles: list[NewsArticle]) -> str
 ```
 
-Collector의 원본 계약을 보존하면서 Provider가 필요한 keyword를 사용하고 rank와 href를
-결과에 연결하기 쉽습니다. 다만 현재 시그니처만으로는 뉴스 제목 같은 외부 문맥을 직접
-전달하지 않습니다.
+Collector의 원본 계약을 보존하면서 Provider가 keyword와 뉴스 문맥을 함께 사용합니다.
+뉴스 URL은 Prompt에 전달하지 않아 모델 입력을 필요한 근거 필드로 제한합니다.
 
 #### 목록을 한 번에 전달
 
@@ -342,10 +343,10 @@ API 호출 수나 batch 처리 효율을 검토하기 쉽지만, 한 항목 실�
 
 #### 현재 계획
 
-MVP Provider 경계는 다음 동기 메서드로 설계합니다.
+현재 MVP Provider 경계는 다음 동기 메서드로 구현했습니다.
 
 ```python
-generate_reason(trend: TrendItem) -> str
+generate_reason(trend: TrendItem, articles: list[NewsArticle]) -> str
 ```
 
 Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합합니다. batch API가
@@ -354,7 +355,7 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
 ### 6.5 Provider 교체 가능성
 
 현재 첫 Provider는 Gemini Flash입니다. 향후 OpenAI, Claude, 로컬 LLM으로 교체할 수
-있도록 상위 계층은 `generate_reason(trend)`라는 동작 계약만 사용하도록 합니다.
+있도록 상위 계층은 `generate_reason(trend, articles)`라는 동작 계약만 사용하도록 합니다.
 
 - **Implemented**: `google-genai` SDK의 `from google import genai`와
   `client.models.generate_content()` 사용
@@ -370,24 +371,28 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
 
 ### 6.6 Prompt 설계 방향
 
-현재 Prompt는 실행 코드의 `build_reason_prompt(trend)` 순수 함수로 분리되어 있습니다.
-단위 테스트는 Prompt 내용과 전달 여부를 검증하지만 실제 생성 품질은 검증하지 않습니다.
-설계상 최소 입력은 검색어입니다.
+현재 Prompt는 실행 코드의 `build_reason_prompt(trend, articles)` 순수 함수로 분리되어
+있습니다. Gemini에는 검색어와 각 뉴스의 title, source, published_at만 전달하며 URL은
+전달하지 않습니다.
 
 ```text
 검색어: {keyword}
+뉴스 문맥: title, source, published_at
 
-이 검색어가 현재 실시간 검색어 순위에 오른 가능한 이유를
-확인된 사실과 추론을 구분하여 한국어 1~2문장으로 설명하라.
-확인하지 못한 사건이나 수치를 사실처럼 만들지 마라.
+검색어가 기사의 핵심 주제인 경우에만 근거로 사용하라.
+여러 기사에서 반복되는 공통 사건을 우선하라.
+제공된 기사 밖의 사실을 추측하지 마라.
+공통 사건이 없으면 "제공된 기사만으로는 정확한 이유를 확인하기 어렵다."라고 답하라.
 ```
 
-향후 뉴스 제목을 사용할 필요가 생기면 Prompt에 선택적 `news_titles` 문맥을 추가할 수
-있습니다. 다만 뉴스 검색과 LLM 생성의 책임을 합치지 않고, 입력 문맥을 명시적으로 전달하는
-구조를 유지합니다.
+현재 뉴스 Provider가 반환한 title, source, published_at을 Prompt에 전달합니다. 향후
+summary나 본문을 추가할 필요가 생기면 입력 필드별 근거와 길이 제한을 별도 검증합니다.
 
-- **Implemented**: 현재 Provider는 `TrendItem.keyword`만 Prompt에 포함함
-- **Planned**: 뉴스 제목을 포함한 확장 Prompt
+- **Implemented**: 현재 Provider는 `TrendItem.keyword`와 뉴스 title/source/published_at을 Prompt에 포함함
+- **Implemented**: Prompt에 URL을 포함하지 않음
+- **Implemented**: 기사 핵심 주제·반복 공통 사건·불충분한 근거에 대한 grounding 규칙 추가
+- **Verified**: `손흥민` Live 실행에서 MLS 올스타전·올스타 스킬 챌린지 관련 공통 문맥을 사용한 94자 응답 생성
+- **Planned**: 더 많은 검색어와 반복 실행을 통한 뉴스 문맥 기반 생성 결과의 사실성·품질 평가
 - **Rejected for now**: 확인되지 않은 뉴스나 API 응답을 Prompt에 자동으로 추가함
 
 ### 6.7 CSV 영향 범위

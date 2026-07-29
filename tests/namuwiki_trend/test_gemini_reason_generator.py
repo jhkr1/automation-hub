@@ -1,5 +1,6 @@
 """GeminiReasonGenerator의 네트워크 비의존 테스트."""
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,7 @@ from namuwiki_trend.gemini_reason_generator import (
     GeminiReasonGenerator,
     build_reason_prompt,
 )
-from namuwiki_trend.models import TrendItem
+from namuwiki_trend.models import NewsArticle, TrendItem
 
 
 class FakeModels:
@@ -41,23 +42,76 @@ def _trend(keyword: str = "테스트 검색어") -> TrendItem:
     return TrendItem(rank=1, keyword=keyword, href="/Go?q=test")
 
 
+def _article(
+    title: str = "테스트 검색어 관련 주요 기사",
+    source: str | None = "테스트뉴스",
+) -> NewsArticle:
+    """테스트용 NewsArticle을 만든다."""
+    return NewsArticle(
+        title=title,
+        url="https://news.example/article",
+        source=source,
+        published_at=datetime(2026, 7, 29, 10, tzinfo=timezone.utc),
+    )
+
+
 def test_build_reason_prompt_contains_required_rules() -> None:
-    """Prompt에 keyword와 출력·hallucination 제한을 포함한다."""
-    prompt = build_reason_prompt(_trend())
+    """Prompt에 keyword, 기사 문맥, grounding과 출력 제한을 포함한다."""
+    prompt = build_reason_prompt(_trend(), [_article()])
 
     assert "테스트 검색어" in prompt
+    assert "테스트 검색어 관련 주요 기사" in prompt
+    assert "테스트뉴스" in prompt
+    assert "2026-07-29T10:00:00+00:00" in prompt
     assert "한국어 1~2문장" in prompt
-    assert "추측하지 않는다" in prompt
-    assert "정확한 등재 이유를 확인하기 어렵습니다" in prompt
+    assert "추측하거나 보완하지 않는다" in prompt
+    assert "제공된 기사만으로는 정확한 이유를 확인하기 어렵다." in prompt
+    assert _article().url not in prompt
 
 
 def test_build_reason_prompt_rejects_invalid_input() -> None:
-    """Prompt 경계에서 잘못된 타입과 빈 keyword를 거부한다."""
+    """Prompt 경계에서 잘못된 TrendItem, 기사 목록과 빈 keyword를 거부한다."""
     with pytest.raises(TypeError, match="TrendItem이 아님"):
-        build_reason_prompt("invalid")  # type: ignore[arg-type]
+        build_reason_prompt("invalid", [])  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match="list가 아님"):
+        build_reason_prompt(_trend(), ())  # type: ignore[arg-type]
 
     with pytest.raises(ValueError, match="keyword가 비어 있음"):
-        build_reason_prompt(_trend("  "))
+        build_reason_prompt(_trend("  "), [])
+
+    with pytest.raises(TypeError, match="NewsArticle가 아님"):
+        build_reason_prompt(_trend(), ["invalid"])  # type: ignore[list-item]
+
+    with pytest.raises(ValueError, match="title이 비어 있음"):
+        build_reason_prompt(_trend(), [_article("  ")])
+
+
+def test_build_reason_prompt_handles_no_articles() -> None:
+    """기사가 없으면 정확한 이유를 단정하지 않도록 Prompt를 만든다."""
+    prompt = build_reason_prompt(_trend(), [])
+
+    assert "제공된 기사가 없음" in prompt
+    assert "제공된 기사만으로는 정확한 이유를 확인하기 어렵다." in prompt
+
+
+def test_build_reason_prompt_handles_multiple_articles_and_trimmed_title() -> None:
+    """여러 기사의 제목과 선택적 출처를 trim하여 순서대로 포함한다."""
+    prompt = build_reason_prompt(
+        _trend(),
+        [_article("  첫 번째 제목  "), _article("두 번째 제목", source=None)],
+    )
+
+    assert "- 제목: 첫 번째 제목" in prompt
+    assert "- 제목: 두 번째 제목" in prompt
+    assert "- 출처: 확인되지 않음" in prompt
+    assert prompt.index("첫 번째 제목") < prompt.index("두 번째 제목")
+
+
+def test_build_reason_prompt_rejects_excessive_length() -> None:
+    """기사 문맥이 Prompt 최대 길이를 넘으면 임의로 자르지 않고 실패한다."""
+    with pytest.raises(ValueError, match="Prompt가 최대 길이를 초과함"):
+        build_reason_prompt(_trend(), [_article("가" * 12_001)])
 
 
 def test_generate_reason_returns_trimmed_response_and_passes_model_prompt() -> None:
@@ -65,11 +119,12 @@ def test_generate_reason_returns_trimmed_response_and_passes_model_prompt() -> N
     client = FakeClient(response=SimpleNamespace(text="\n  설명입니다.  \n"))
     generator = GeminiReasonGenerator(client=client)
 
-    result = generator.generate_reason(_trend())
+    result = generator.generate_reason(_trend(), [_article()])
 
     assert result == "설명입니다."
     assert client.models.calls[0]["model"] == DEFAULT_MODEL
     assert "테스트 검색어" in client.models.calls[0]["contents"]
+    assert _article().url not in client.models.calls[0]["contents"]
 
 
 def test_generator_rejects_missing_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -86,7 +141,7 @@ def test_generate_reason_propagates_sdk_error() -> None:
     generator = GeminiReasonGenerator(client=FakeClient(error=expected))
 
     with pytest.raises(RuntimeError, match="fake SDK failure") as raised:
-        generator.generate_reason(_trend())
+        generator.generate_reason(_trend(), [])
 
     assert raised.value is expected
 
@@ -104,7 +159,7 @@ def test_generate_reason_rejects_invalid_response(response: object, message: str
     generator = GeminiReasonGenerator(client=FakeClient(response=response))
 
     with pytest.raises(RuntimeError, match=message):
-        generator.generate_reason(_trend())
+        generator.generate_reason(_trend(), [])
 
 
 def test_generate_reason_rejects_excessively_long_response() -> None:
@@ -113,4 +168,4 @@ def test_generate_reason_rejects_excessively_long_response() -> None:
     generator = GeminiReasonGenerator(client=FakeClient(response=response))
 
     with pytest.raises(ValueError, match="최대 길이를 초과함"):
-        generator.generate_reason(_trend())
+        generator.generate_reason(_trend(), [])
