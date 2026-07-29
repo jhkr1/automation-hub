@@ -709,3 +709,30 @@ git diff --check
 - Free Tier quota는 프로젝트·모델 조건에 따라 달라지며, quota 초과 시 bounded retry 후 실패할 수 있음
 - 2026-07-29 Live 실행 stdout에서는 429 retry 발생을 확인하지 못함
 - JSON schema migration과 backward compatibility는 `schema_version`만 정의된 상태임
+
+## 11. Quality Diagnostics
+
+`InsightQualityAnalyzer`는 `Sequence[TrendInsight]`를 입력받아 현재 Enrichment 결과의
+구조적·관찰 가능한 품질 지표를 계산합니다. 분석 계층은 Collector, News Provider,
+Gemini, TrendPipeline, JSON schema를 수정하지 않으며 외부 API를 호출하지 않습니다.
+
+### 11.1 Report 지표
+
+`InsightQualityReport`는 다음 값을 immutable dataclass로 반환합니다.
+
+- 전체 Insight 개수
+- fallback reason 개수
+- article이 0개인 Insight 개수
+- Insight별 article 개수
+- keyword가 article title에 포함된 기사 개수
+- keyword가 어떤 title에도 포함되지 않은 Insight의 rank
+- 실행 전체에서 두 번 이상 등장한 서로 다른 article URL 개수
+- rank 순서 이상 여부
+- 비어 있는 keyword와 reason 개수
+
+### 11.2 Heuristic 한계
+
+keyword-title match는 trim 후 `casefold()`한 문자열 포함 여부만 확인합니다. 이는 의미적
+관련성, 동명이인 구분, 다의어 해석, 기사의 실제 원인 여부를 판정하지 않습니다.
+따라서 `InsightQualityReport`는 품질 문제를 관찰하기 위한 진단 자료이며, 뉴스 검색
+알고리즘이나 Gemini Prompt의 품질을 자동으로 보증하는 평가 결과가 아닙니다.

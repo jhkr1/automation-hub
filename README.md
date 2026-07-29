@@ -18,6 +18,7 @@ Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프�
 - 단일 `TrendItem` enrichment와 `TrendInsight` 생성
 - `TrendPipeline` 기반 Top10 목록 enrichment orchestration
 - `TrendInsight` JSON 저장
+- `TrendInsight` 품질 진단 지표 계산
 - 외부 명령을 통합 실행하는 verification Harness
 
 `google_finance`는 현재 `config.py`와 `models.py`만 구현되어 있습니다.
@@ -86,6 +87,7 @@ Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 �
 - `TrendPipeline`: Unit Verified
 - `JsonTrendInsightStorage`: Unit Verified
 - Application Entry Point: Unit Verified
+- `InsightQualityAnalyzer`: Unit Verified
 - 전체 Application Pipeline: Live Verified (2026-07-29)
 
 단일 Provider PoC는 다음 명령으로 직접 실행할 수 있습니다.
