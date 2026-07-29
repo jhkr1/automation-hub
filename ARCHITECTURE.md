@@ -220,7 +220,7 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 
 위 조건이 발생하면 Selenium 또는 requests 기반 방식을 새 Evidence로 검증한 후 재결정합니다.
 
-## 6. LLM Enrichment Layer (Planned)
+## 6. LLM Enrichment Layer (Planned; Gemini Provider Implemented)
 
 ### 6.1 목표와 현재 상태
 
@@ -237,12 +237,16 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 
 - **Implemented**: Collector는 `list[TrendItem]`만 반환함
 - **Implemented**: CSV 저장은 `TrendItem`만 입력으로 받음
+- **Implemented**: `gemini_reason_generator.py`의 `GeminiReasonGenerator` 구현
+- **Implemented**: Provider 공개 API `generate_reason(trend: TrendItem) -> str`
+- **Implemented**: Gemini API 호출, 응답 text 검증, 최대 300자 검증
 - **Planned**: `TrendItem`을 설명 결과와 결합하는 LLM Enrichment Layer
-- **Planned**: Gemini Flash 기반 첫 Provider 검토
-- **Rejected for now**: 이번 Sprint의 Gemini API 호출, API Key 사용, 뉴스 검색, Prompt 테스트,
-  CSV 스키마 변경
+- **Planned**: Gemini API Live 검증
+- **Rejected for now**: 뉴스 검색, Prompt 기반 최신성 보강, CSV 스키마 변경,
+  Top10 전체 enrichment pipeline
 
-이번 기록은 설계안이며 실제 Gemini API 호출이나 생성 품질을 검증한 결과가 아닙니다.
+단위 테스트는 fake client로 검증했지만, 현재 환경에 `GEMINI_API_KEY`가 없어 실제 Gemini API
+호출과 생성 품질은 `확인하지 못함`으로 기록합니다.
 
 ### 6.2 모델 경계 검토
 
@@ -281,7 +285,7 @@ Enrichment 결과임을 명확히 표현할 수 있다는 점입니다. 단점�
 - **Reconsider when**: 모든 소비자가 항상 설명을 요구하고 원시 TrendItem 계약을 변경해도
   호환성 문제가 없다는 Evidence가 확인되면 단일 모델 통합을 재검토함
 
-이번 Sprint에서는 `TrendInsight` 클래스를 구현하지 않습니다.
+이번 Sprint에서는 `TrendInsight` 클래스를 구현하지 않았습니다.
 
 ### 6.3 LLM 계층 책임과 데이터 흐름
 
@@ -349,10 +353,13 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
 
 ### 6.5 Provider 교체 가능성
 
-현재 첫 Provider 후보는 Gemini Flash입니다. 향후 OpenAI, Claude, 로컬 LLM으로 교체할 수
+현재 첫 Provider는 Gemini Flash입니다. 향후 OpenAI, Claude, 로컬 LLM으로 교체할 수
 있도록 상위 계층은 `generate_reason(trend)`라는 동작 계약만 사용하도록 합니다.
 
-- **Planned**: Gemini Provider는 API 호출과 Provider별 요청·응답 형식을 캡슐화함
+- **Implemented**: `google-genai` SDK의 `from google import genai`와
+  `client.models.generate_content()` 사용
+- **Implemented**: 공식 model identifier `gemini-3.5-flash`를 `DEFAULT_MODEL` 한 곳에서 관리함
+- **Implemented**: `GEMINI_API_KEY` 환경 변수를 사용하며 코드에 key를 저장하지 않음
 - **Reconsider when**: 두 번째 Provider가 실제로 추가될 때 공통 Protocol 또는 최소 인터페이스를
   코드로 도입함
 - **Rejected for now**: Provider가 하나뿐인 단계에서 abstract base class, DI container,
@@ -363,7 +370,9 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
 
 ### 6.6 Prompt 설계 방향
 
-이번 Sprint에서는 Prompt를 실행하거나 테스트하지 않습니다. 설계상 최소 입력은 검색어입니다.
+현재 Prompt는 실행 코드의 `build_reason_prompt(trend)` 순수 함수로 분리되어 있습니다.
+단위 테스트는 Prompt 내용과 전달 여부를 검증하지만 실제 생성 품질은 검증하지 않습니다.
+설계상 최소 입력은 검색어입니다.
 
 ```text
 검색어: {keyword}
@@ -377,7 +386,7 @@ Reason Generator가 항목별로 호출하고 결과를 `TrendInsight`에 결합
 있습니다. 다만 뉴스 검색과 LLM 생성의 책임을 합치지 않고, 입력 문맥을 명시적으로 전달하는
 구조를 유지합니다.
 
-- **Verified**: 현재 Collector가 제공하는 확정 입력은 `TrendItem.keyword`임
+- **Implemented**: 현재 Provider는 `TrendItem.keyword`만 Prompt에 포함함
 - **Planned**: 뉴스 제목을 포함한 확장 Prompt
 - **Rejected for now**: 확인되지 않은 뉴스나 API 응답을 Prompt에 자동으로 추가함
 
@@ -404,9 +413,9 @@ rank,keyword,href
 - **Reconsider when**: 실제 소비자가 원본과 설명을 항상 함께 요구하는지, LLM 실패를 어떻게
   표현할지 확인된 후 컬럼 추가 또는 별도 파일을 결정함
 
-### 6.8 다음 구현 Sprint의 검증 조건
+### 6.8 다음 검증 Sprint의 조건
 
-다음 Sprint에서 Gemini를 연결할 때 다음을 별도로 검증해야 합니다.
+다음 Sprint에서 실제 Gemini API 호출과 Enrichment 연결을 진행할 때 다음을 별도로 검증해야 합니다.
 
 - API Key를 코드나 로그에 노출하지 않는지
 - Gemini Provider가 Collector와 분리되어 있는지
@@ -414,3 +423,9 @@ rank,keyword,href
 - `TrendItem` 원본 결과가 LLM 실패로 손상되지 않는지
 - 생성된 reason이 1~2줄 요구를 만족하는지
 - 실제 API 호출 테스트와 네트워크 비의존 테스트의 경계를 어떻게 나누는지
+
+공식 참고 문서:
+
+- [Gemini API 시작하기](https://ai.google.dev/gemini-api/docs/generate-content/get-started)
+- [Gemini 3.5 Flash 모델 ID](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.5)
+- [Gemini API Key 사용](https://ai.google.dev/gemini-api/docs/generate-content/api-key)
