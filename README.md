@@ -44,7 +44,8 @@ list[TrendItem]
 ```
 
 `TrendPipeline`은 Collector callable과 `TrendEnricher`를 주입받아 목록 순회와 결과 순서
-보존을 담당합니다. 아직 이를 실행하는 Application Entry Point는 구현되지 않았습니다.
+보존을 담당합니다. `namuwiki_trend.main`은 운영 의존성을 조립하고 Pipeline 실행 결과를
+`output/trend_insights.json`에 저장하는 Application Entry Point입니다.
 
 ## 개발 환경
 
@@ -83,7 +84,7 @@ Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 �
 - `TrendEnricher`: Unit Verified
 - `TrendPipeline`: Unit Verified
 - `JsonTrendInsightStorage`: Unit Verified
-- 전체 실행 Entry Point: 미구현
+- Application Entry Point: Unit Verified
 - 전체 Pipeline Live Verification: 미수행
 
 단일 Provider PoC는 다음 명령으로 직접 실행할 수 있습니다.
@@ -91,17 +92,16 @@ Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 �
 ```bash
 python -m namuwiki_trend.news_context_poc
 python -m namuwiki_trend.playwright_poc
+python -m namuwiki_trend.main
 ```
 
-두 명령은 운영용 전체 Pipeline이 아니라 개별 기술 검증용 실행 경로입니다.
+앞의 두 명령은 개별 기술 검증용이며, 마지막 명령은 Collector부터 JSON 저장까지 실행합니다.
 
 ## Planned / Not Implemented
 
 현재 다음 기능은 구현되지 않았습니다.
 
-- `namuwiki_trend.main`
 - `google_finance.main`
-- 전체 Application Entry Point
 - Scheduler와 Cron 설정
 - Retry와 Cache
 - Database 저장
@@ -130,7 +130,7 @@ python -m namuwiki_trend.playwright_poc
 1. 완료: Top10 Batch Orchestrator
 2. 완료: Enriched Output Contract
 3. 완료: `TrendInsight` Storage
-4. 단일 실행 Application Entry Point
+4. 완료: 단일 실행 Application Entry Point
 5. 전체 Pipeline Live Verification
 
 계층 책임과 상세 설계 결정은 [ARCHITECTURE.md](ARCHITECTURE.md)에 기록합니다.

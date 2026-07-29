@@ -20,7 +20,7 @@
 - **이유**: 각 모듈의 코드가 100줄 이내로 매우 짧습니다. 서브 디렉토리를 깊게 파는 것은 오히려 불필요한 `__init__.py`를 양산하고 임포트 경로만 복잡하게 만듭니다.
 
 ### `src/` 레이아웃 배제
-- **이유**: `src/` 구조는 PyPI 등 외부에 라이브러리를 배포할 때 유용합니다. 현재는 flat layout의 모듈과 `scripts/verify.py`를 기준으로 개발합니다. 단일 실행 Entry Point는 Planned입니다.
+- **이유**: `src/` 구조는 PyPI 등 외부에 라이브러리를 배포할 때 유용합니다. 현재는 flat layout의 모듈과 `scripts/verify.py`를 기준으로 개발합니다. 단일 실행 Entry Point는 `namuwiki_trend.main`에 구현되어 있습니다.
 
 ## 3. 다른 방법과의 비교
 
@@ -238,8 +238,8 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
             ↓
     TrendInsight
 
-Collector와 TrendEnricher를 연결하는 Top10 전체 Application Pipeline은 아직 구현되지
-않았습니다.
+Collector와 TrendEnricher를 연결하는 Top10 전체 Application Pipeline과 이를 조립하는
+`namuwiki_trend.main` Entry Point를 구현했습니다.
 
 - **Implemented**: Collector는 `list[TrendItem]`만 반환함
 - **Implemented**: CSV 저장은 `TrendItem`만 입력으로 받음
@@ -251,8 +251,27 @@ Collector와 TrendEnricher를 연결하는 Top10 전체 Application Pipeline은 
 - **Evidence**: Prompt에는 title/source/published_at만 포함되고 URL은 포함되지 않았으며, 응답 94자·전체 호출 시간 약 5.857초를 확인함
 - **Implemented**: `TrendEnricher`가 `TrendItem`과 뉴스 문맥·reason을 `TrendInsight`로 결합함
 - **Implemented**: `TrendPipeline`이 Collector의 목록을 순서대로 `TrendEnricher`에 전달함
-- **Rejected for now**: Prompt 기반 최신성 보강, CSV 스키마 변경,
-  전체 실행 Entry Point
+- **Implemented**: `main.py`가 운영용 Provider, Enricher, Pipeline, JSON Storage를 조립함
+- **Implemented**: `python -m namuwiki_trend.main`으로 전체 흐름을 실행함
+- **Implemented**: 기본 출력 경로는 `output/trend_insights.json`임
+- **Rejected for now**: Prompt 기반 최신성 보강, CSV 스키마 변경
+
+### 6.5 Application Entry Point
+
+`main.py`는 Composition Root로서 운영 의존성을 생성하고 다음 흐름을 조립합니다.
+
+    collect_trends
+    ↓
+    TrendPipeline.run()
+    ↓
+    JsonTrendInsightStorage.save()
+
+- `build_pipeline()`이 `NewsContextProvider`, `GeminiReasonGenerator`, `TrendEnricher`와
+  `TrendPipeline`을 생성합니다.
+- `run_application()`이 Pipeline 결과를 Storage에 전달합니다.
+- `main()`은 성공 시 `0`, 실행 예외 발생 시 `1`을 반환합니다.
+- CLI 옵션, Scheduler, Retry, Cache, 병렬 처리와 저장 이후 후속 작업은 담당하지 않습니다.
+- 테스트에서는 `run_application()`에 Fake Pipeline과 Fake Storage를 주입합니다.
 
 단위 테스트는 fake client로 검증합니다. 실제 Gemini 응답의 사실성·생성 품질은 뉴스 문맥의
 품질과 모델 응답에 의존하므로 Unit Test만으로 확정하지 않습니다.
@@ -604,15 +623,15 @@ git diff --check
 
 ## 9. MVP Roadmap
 
-현재 MVP는 단일 항목 enrichment와 Top10 Batch Orchestrator까지 구현되었으며, 실행 Entry
-Point와 결과 저장이 남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
+현재 MVP는 단일 실행 Entry Point를 포함한 수집·enrichment·JSON 저장 흐름까지 구현되었으며,
+전체 Pipeline Live Verification이 남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
 
 1. **완료: Top10 Batch Orchestrator**: `TrendPipeline`이 Collector의 `list[TrendItem]`을
    순회하여 `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
 2. **완료: Enriched Output Contract**: JSON 최상위 구조, schema version, 시간·encoding,
    overwrite 정책을 확정함.
 3. **완료: TrendInsight Storage**: 확정된 JSON 계약에 따라 Enriched 결과를 저장함.
-4. **Application Entry Point**: Collector, Batch Orchestrator, Storage를 단일 실행 명령으로
+4. **완료: Application Entry Point**: Collector, Batch Orchestrator, Storage를 단일 실행 명령으로
    연결함. Scheduler는 포함하지 않음.
 5. **전체 Pipeline Live Verification**: 실제 Top10 1회 실행으로 수집·뉴스·Gemini·저장을
    검증함.
@@ -676,5 +695,5 @@ Point와 결과 저장이 남아 있습니다. 권장 순서는 책임을 섞지
 ### 10.3 Known Limitation
 
 - 파일은 overwrite되며 append·날짜별 보관·장기 누적은 구현하지 않음
-- JSON을 `TrendPipeline`에 연결하는 Application Entry Point는 아직 없음
+- 전체 Pipeline의 실제 네트워크·Gemini·파일 저장을 한 번에 검증하는 Live 실행은 아직 없음
 - JSON schema migration과 backward compatibility는 `schema_version`만 정의된 상태임
