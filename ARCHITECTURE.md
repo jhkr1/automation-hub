@@ -118,6 +118,7 @@ Selenium Grid 및 기존 기업 자산을 활용할 수 있습니다. Selenium M
 - sentinel 제거 후 `TrendItem` 10개와 rank 1~10을 반환함
 - Headless/Headed 각각 5회 반복에서 동일한 DOM 규칙을 관찰함
 - 순수 추출 및 Collector 경계 테스트 21개가 통과함
+- CSV 저장 테스트 추가 후 전체 테스트 27개가 통과함
 - 운영 Collector 기반 live PoC 실행이 성공함
 
 위 Evidence는 현재 실행과 조사에서 확인한 범위에 한정됩니다. 향후 모든 실행에서도
@@ -135,7 +136,10 @@ Selenium Grid 및 기존 기업 자산을 활용할 수 있습니다. Selenium M
 - **Implemented**: `models.py`는 `TrendItem`을 정의함
 - **Implemented**: `playwright_poc.py`는 Collector 수동 실행과 결과 확인만 담당함
 - **Implemented**: Collector 및 순수 추출 테스트 21개 통과
-- **Planned**: 수집 결과 저장
+- **Implemented**: `csv_storage.py`의 `save_trends_to_csv()`가 `Sequence[TrendItem]`을 CSV로 저장함
+- **Implemented**: CSV 테스트를 포함한 전체 테스트 27개 통과
+- **Implemented**: `utf-8-sig`, `newline=""`, 부모 디렉터리 자동 생성, 기존 파일 덮어쓰기 정책 적용
+- **Planned**: 수집 시각을 포함한 저장 스키마 검토
 - **Rejected for now**: XLSX 저장, Database 저장, Scheduler, CLI,
   Logging framework, retry, fallback locator
 
@@ -165,11 +169,14 @@ Playwright는 DOM에서 원시 항목을 읽고, sentinel·개수·rank 검증�
 - XLSX: 사람이 읽고 필터링하는 보고서에 적합함
 - Database: 장기 누적, 조회, 무결성, 동시성 요구가 있을 때 적합함
 
-현재 저장 기능은 아직 구현하지 않았습니다.
+현재 첫 저장 기능으로 CSV를 구현했습니다.
 
-- **Planned**: 첫 저장 기능은 CSV로 구현함
+- **Implemented**: `save_trends_to_csv(items, output_path) -> Path`
 - **선택 근거**: 현재 데이터가 `rank`, `keyword`, `href`로 구성된 단순 tabular data이고,
   저장 파이프라인 검증에 서식이나 여러 Sheet가 필요하지 않으며, 추가 외부 의존성 없이 구현할 수 있음
+- **Implemented**: UTF-8 BOM을 포함한 `utf-8-sig`로 한국어와 Windows Excel 소비를 고려함
+- **Implemented**: 부모 디렉터리를 자동 생성하고 같은 경로의 기존 파일을 덮어씀
+- **Rejected for now**: append와 atomic write는 누적 저장·무결성 요구가 명시되지 않아 구현하지 않음
 - **Rejected for now**: XLSX와 Database는 현재 요구사항에 필요한 조건이 확인되지 않음
 
 ### 5.9 저장 형식 재검토 조건
