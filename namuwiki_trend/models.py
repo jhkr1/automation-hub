@@ -36,6 +36,15 @@ class NewsArticle:
     published_at: datetime | None = None
 
 
+@dataclass(frozen=True)
+class TrendInsight:
+    """TrendItem과 뉴스 근거 기반 reason을 묶은 enrichment 결과."""
+
+    trend: TrendItem
+    reason: str
+    articles: tuple[NewsArticle, ...]
+
+
 @dataclass
 class TrendReport:
     """최종 결과물. 키워드 + 뉴스 + LLM 요약을 합친 보고서 1건."""

@@ -19,6 +19,16 @@
 - 공통 코드가 세 곳 이상에서 실제로 반복될 때만 공통화를 검토한다.
 - 각 패키지의 독립성을 유지한다.
 
+### Architecture Rule
+
+- Application Layer가 흐름을 조정하고, Provider Layer가 외부 시스템을 감싸며, Model Layer가 데이터 계약을 보존한다.
+- Collector와 Provider는 상위 Application Layer나 LLM을 직접 호출하지 않는다.
+
+### Dependency Injection Rule
+
+- 외부 시스템과 생성기는 생성자 주입을 우선한다.
+- 테스트에서는 Fake/Mock 구현을 주입하고 실제 외부 API를 호출하지 않는다.
+
 ## 2. Working Principles
 
 ### KISS
@@ -57,16 +67,6 @@
 - 기존 구현과 요청사항의 차이
 - 기존 사용자 변경사항
 
-권장 명령:
-
-```bash
-pwd
-rg --files
-git status --short --branch
-ruff check .
-pytest -q
-```
-
 ### Planning Rule
 
 코드를 수정하기 전에 다음을 먼저 제시한다.
@@ -87,10 +87,11 @@ pytest -q
 3. 테스트 추가 또는 수정
 4. `ruff check .` 실행
 5. `pytest -q` 실행
-6. 관련 문서 업데이트
-7. `git diff --check` 실행
-8. `git diff`와 `git status` 재확인
-9. 커밋
+6. `python -m compileall namuwiki_trend tests` 실행
+7. 관련 문서 업데이트
+8. `git diff --check` 실행
+9. `git diff`와 `git status` 재확인
+10. 커밋
 
 ### 완료 후 확인사항
 
@@ -219,14 +220,10 @@ AI는 실제 구현된 코드와 검증 결과만 근거로 판단한다.
 - 새로운 기능에는 가능한 테스트를 추가한다.
 - 테스트가 없다면 테스트 추가 가능성을 먼저 판단한다.
 - 파서와 변환 로직은 fixture 또는 mock으로 테스트한다.
+- 외부 Provider와 SDK는 Fake/Mock으로 대체한다.
 - 기본 테스트가 외부 네트워크에 의존하지 않도록 한다.
 - 빈 응답, 잘못된 응답, timeout과 부분 데이터를 검토한다.
 - 테스트를 실행하지 못하면 원인을 보고한다.
-
-```bash
-pytest -q
-ruff check .
-```
 
 실제 테스트가 없을 경우 `no tests ran`을 성공으로 보고하지 않는다.
 

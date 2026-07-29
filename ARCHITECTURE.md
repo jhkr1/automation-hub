@@ -220,7 +220,7 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 
 위 조건이 발생하면 Selenium 또는 requests 기반 방식을 새 Evidence로 검증한 후 재결정합니다.
 
-## 6. LLM Enrichment Layer (Planned; Gemini Provider Implemented)
+## 6. LLM Enrichment Layer (Implemented; Gemini Provider and TrendEnricher)
 
 ### 6.1 목표와 현재 상태
 
@@ -243,7 +243,7 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 - **Implemented**: `build_reason_prompt()`의 뉴스 문맥 grounding과 URL 제외
 - **Verified**: `손흥민` 1건으로 Google News RSS 5건과 Gemini 응답을 연속 호출함
 - **Evidence**: Prompt에는 title/source/published_at만 포함되고 URL은 포함되지 않았으며, 응답 94자·전체 호출 시간 약 5.857초를 확인함
-- **Planned**: `TrendItem`을 설명 결과와 결합하는 LLM Enrichment Layer
+- **Implemented**: `TrendEnricher`가 `TrendItem`과 뉴스 문맥·reason을 `TrendInsight`로 결합함
 - **Rejected for now**: Prompt 기반 최신성 보강, CSV 스키마 변경,
   Top10 전체 enrichment pipeline
 
@@ -287,11 +287,11 @@ Enrichment 결과임을 명확히 표현할 수 있다는 점입니다. 단점�
 - **Reconsider when**: 모든 소비자가 항상 설명을 요구하고 원시 TrendItem 계약을 변경해도
   호환성 문제가 없다는 Evidence가 확인되면 단일 모델 통합을 재검토함
 
-이번 Sprint에서는 `TrendInsight` 클래스를 구현하지 않았습니다.
+**Implemented**: `TrendInsight`는 원본 TrendItem, 뉴스 근거 tuple, 생성된 reason을 묶습니다.
 
 ### 6.3 LLM 계층 책임과 데이터 흐름
 
-계획하는 책임 분리는 다음과 같습니다.
+현재 책임 분리는 다음과 같습니다.
 
     Collector
     ↓ list[TrendItem]
@@ -414,13 +414,13 @@ rank,keyword,href
 현재는 기존 CSV를 변경하지 않습니다.
 
 - **Implemented**: 원본 CSV는 `rank,keyword,href` 유지
-- **Planned**: LLM 구현 Sprint에서 `reason` 저장 위치와 스키마를 별도 결정
+- **Planned**: 후속 저장 Sprint에서 `reason` 저장 위치와 스키마를 별도 결정
 - **Reconsider when**: 실제 소비자가 원본과 설명을 항상 함께 요구하는지, LLM 실패를 어떻게
   표현할지 확인된 후 컬럼 추가 또는 별도 파일을 결정함
 
-### 6.8 다음 검증 Sprint의 조건
+### 6.8 후속 검증 조건
 
-다음 Sprint에서 실제 Gemini API 호출과 Enrichment 연결을 진행할 때 다음을 별도로 검증해야 합니다.
+후속 운영 확장과 실제 Gemini 호출을 반복 검증할 때 다음을 별도로 확인해야 합니다.
 
 - API Key를 코드나 로그에 노출하지 않는지
 - Gemini Provider가 Collector와 분리되어 있는지
@@ -428,6 +428,35 @@ rank,keyword,href
 - `TrendItem` 원본 결과가 LLM 실패로 손상되지 않는지
 - 생성된 reason이 1~2줄 요구를 만족하는지
 - 실제 API 호출 테스트와 네트워크 비의존 테스트의 경계를 어떻게 나누는지
+
+### 6.9 Trend Enrichment Application Layer
+
+현재 단일 항목 enrichment 흐름은 다음과 같습니다.
+
+```text
+TrendItem
+    ↓ keyword
+NewsContextProvider.search()
+    ↓ list[NewsArticle]
+GeminiReasonGenerator.generate_reason()
+    ↓ reason
+TrendInsight
+```
+
+- **Application Layer**: `TrendEnricher`가 뉴스 검색, reason 생성, 결과 조합 순서를 조정함
+- **Provider Layer**: `NewsContextProvider`는 뉴스 문맥을, `GeminiReasonGenerator`는 Gemini 응답을 담당함
+- **Model Layer**: `TrendItem`은 원본 순위 데이터, `NewsArticle`은 뉴스 근거, `TrendInsight`는 결합 결과를 표현함
+- **Dependency Injection**: `TrendEnricher`는 Provider와 Generator를 생성자로 받아 테스트 대체 구현을 허용함
+- **Implemented**: `TrendEnricher.enrich(trend) -> TrendInsight`
+- **Implemented**: 뉴스 호출 limit 전달, 빈 기사 전달, reason trim·타입·빈 값·최대 300자 검증
+- **Not implemented**: Top10 batch, CSV 저장, Scheduler, retry, cache, CLI
+
+Known Limitation:
+
+- 현재 `TrendEnricher`는 한 번에 `TrendItem` 하나만 처리함
+- 빈 뉴스 목록도 오류로 보정하지 않고 Gemini에 전달함
+- 뉴스 기사의 핵심 주제 여부는 Prompt 지침에 의존하며 별도 분류기는 없음
+- `TrendInsight` 저장 형식과 장기 누적 정책은 아직 결정하지 않음
 
 공식 참고 문서:
 
