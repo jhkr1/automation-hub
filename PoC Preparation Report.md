@@ -575,3 +575,118 @@ Headless browser launch가 실패했으므로 다음 단계는 실행하지 못�
 
 이번 실패의 직접 원인은 브라우저 바이너리 자체가 아니라 Linux 시스템 라이브러리 부족이다.
 시스템 의존성을 설치한 뒤 Headless 실행을 다시 검증해야 한다.
+
+## 13. 두 번째 환경 실험 결과
+
+사용자가 Linux 시스템 의존성 설치를 완료한 후 Headless 실험을 다시 수행했다.
+
+### 13.1 환경 확인
+
+- libnspr4.so 확인 성공
+- libnss3.so 확인 성공
+- Playwright Python import 성공
+- Chromium과 Headless Shell 설치 목록 확인 성공
+
+### 13.2 대상 URL 재검증
+
+기존 fixture의 canonical 문서 URL:
+
+    https://namu.wiki/w/%EB%82%98%EB%AC%B4%EC%9C%84:%EB%8C%80%EB%AC%B8
+
+이 URL은 Headless에서 HTTP 404를 반환했다.
+따라서 PoC의 live 접속 대상은 저장된 canonical 문서 URL이 아니라 홈페이지 root URL로 변경한다.
+
+홈페이지 URL:
+
+    https://namu.wiki/
+
+홈페이지 URL의 Headless 결과:
+
+- HTTP status: 200
+- title: 나무위키:대문 - 나무위키
+- 최종 URL: https://namu.wiki/w/%EB%82%98%EB%AC%B4%EC%9C%84%ED%82%A4:%EB%8C%80%EB%AC%B8
+- console error: 0건
+- page error: 0건
+
+실험 출력에서 최종 URL은 다음과 같이 확인되었다.
+
+    https://namu.wiki/w/%EB%82%98%EB%AC%B4%EC%9C%84%ED%82%A4:%EB%8C%80%EB%AC%B8
+
+### 13.3 실시간 검색어 DOM 재확인
+
+Headless 홈페이지에서 다음 후보를 확인했다.
+
+    ul.yKuNIpkC
+
+결과:
+
+- locator count: 1
+- visible: true
+- 직접 자식 li 수: 실행 시점에 10 또는 11
+- li 내부는 a와 span으로 구성
+- a href는 /Go?q= 형태
+- a title과 span 텍스트에 검색어가 존재
+- root에는 id가 없음
+- root와 li에는 data-v 속성이 있으나 값은 빌드 생성형으로 보임
+
+관찰된 DOM 구조:
+
+    ul.yKuNIpkC
+      └── li.aabxWUc+
+          └── a.ntqH4deF[href^="/Go?q="]
+              └── span.HiABlndl
+
+첫 번째 목록의 마지막 항목이 첫 번째 항목과 중복되는 실행이 반복되었다.
+이는 10개 검색어와 carousel 반복 sentinel이 함께 렌더링되는 구조일 가능성이 있지만,
+현재 실험만으로 내부 의도를 확정하지 않는다.
+
+### 13.4 Locator 후보 비교
+
+홈페이지에서 다음 후보를 비교했다.
+
+| 후보 | 선택 결과 | 평가 |
+|---|---:|---|
+| ul.yKuNIpkC | 1개 | 현재 실행에서 정확히 한 root를 선택하지만 generated class에 의존함 |
+| ul[data-v-ca9e9b6d] | 1개 | 현재 실행에서 선택되지만 data-v 값이 빌드 생성형임 |
+| ul:has(> li > a[href^="/Go?q="]) | 1개 | 검색어 링크의 실제 href 구조를 반영하며 class보다 의미가 명확함 |
+| ul:has(> li > a > span) | 2개 | 다른 목록도 선택하여 범위가 넓음 |
+
+현재 PoC 후보 우선순위:
+
+1. ul:has(> li > a[href^="/Go?q="])
+2. ul.yKuNIpkC
+3. ul[data-v-ca9e9b6d]
+4. ul:has(> li > a > span)
+
+첫 번째 후보도 10회 반복 실행과 DOM 시점별 항목 수 차이를 추가 검증해야 한다.
+아직 운영용 locator로 확정하지 않는다.
+
+### 13.5 10회 반복 결과
+
+홈페이지 URL과 ul.yKuNIpkC 후보로 Headless 실행을 10회 반복했다.
+
+- 10회 모두 HTTP 200
+- 10회 모두 후보 locator count 1
+- 10회 모두 직접 li count 10으로 관찰됨
+- 10회 모두 마지막 항목과 첫 항목이 중복됨
+- 평균 실행 시간: 1490.4ms
+- 최소 실행 시간: 1341.2ms
+- 최대 실행 시간: 1689.8ms
+
+10회 접속 자체는 성공했지만, 중복 sentinel 때문에 10개 li를 곧바로 1~10위 데이터로 간주할 수 없다.
+따라서 Top10 추출 성공 기준은 아직 통과하지 못했다.
+
+### 13.6 실험 판정
+
+- 시스템 의존성 준비: 성공
+- Headless Chromium launch: 성공
+- 홈페이지 접속: 성공
+- 페이지 제목과 최종 URL 출력: 성공
+- live DOM 후보 재확인: 성공
+- 단일 root locator 선택: 10회 성공
+- Top10 추출: 미구현 및 미판정
+- Locator 운영 채택: 보류
+
+이번 실험으로 홈페이지 root URL과 브라우저 실행 환경은 검증했다.
+그러나 첫 번째 DOM 후보는 실행 시점에 따라 항목 수가 달라지고 중복 sentinel이 관찰되므로,
+다음 단계에서 렌더링 안정화 시점과 실제 순위 데이터 경계를 추가로 확인해야 한다.
