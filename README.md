@@ -15,6 +15,8 @@ Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프�
 - 뉴스 문맥을 사용하는 Gemini Prompt grounding
 - Gemini `gemini-3.5-flash` 기반 reason 생성
 - 단일 `TrendItem` enrichment와 `TrendInsight` 생성
+- `TrendPipeline` 기반 Top10 목록 enrichment orchestration
+- `TrendInsight` JSON 저장
 - 외부 명령을 통합 실행하는 verification Harness
 
 `google_finance`는 현재 `config.py`와 `models.py`만 구현되어 있습니다.
@@ -28,7 +30,9 @@ Playwright Collector
         ↓
 list[TrendItem]
         ├── save_trends_to_csv()
-        └── TrendEnricher.enrich(trend)
+        └── TrendPipeline.run()
+                ↓
+        TrendEnricher.enrich(trend)
                 ↓
         NewsContextProvider
                 ↓
@@ -39,8 +43,8 @@ list[TrendItem]
         TrendInsight
 ```
 
-현재 `TrendEnricher`는 단일 `TrendItem`만 처리합니다. Collector와 TrendEnricher를 연결하는
-Top10 전체 Application Pipeline은 아직 구현되지 않았습니다.
+`TrendPipeline`은 Collector callable과 `TrendEnricher`를 주입받아 목록 순회와 결과 순서
+보존을 담당합니다. 아직 이를 실행하는 Application Entry Point는 구현되지 않았습니다.
 
 ## 개발 환경
 
@@ -77,7 +81,9 @@ Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 �
 - `NewsContextProvider`: Live Verified
 - `GeminiReasonGenerator`: Live Verified
 - `TrendEnricher`: Unit Verified
-- 전체 Top10 Pipeline: 미구현
+- `TrendPipeline`: Unit Verified
+- `JsonTrendInsightStorage`: Unit Verified
+- 전체 실행 Entry Point: 미구현
 - 전체 Pipeline Live Verification: 미수행
 
 단일 Provider PoC는 다음 명령으로 직접 실행할 수 있습니다.
@@ -93,10 +99,9 @@ python -m namuwiki_trend.playwright_poc
 
 현재 다음 기능은 구현되지 않았습니다.
 
-- Top10 Batch Orchestrator
-- `TrendInsight` 저장
 - `namuwiki_trend.main`
 - `google_finance.main`
+- 전체 Application Entry Point
 - Scheduler와 Cron 설정
 - Retry와 Cache
 - Database 저장
@@ -122,9 +127,9 @@ python -m namuwiki_trend.playwright_poc
 
 권장 구현 순서는 다음과 같습니다.
 
-1. Top10 Batch Orchestrator
-2. Enriched Output Contract
-3. `TrendInsight` Storage
+1. 완료: Top10 Batch Orchestrator
+2. 완료: Enriched Output Contract
+3. 완료: `TrendInsight` Storage
 4. 단일 실행 Application Entry Point
 5. 전체 Pipeline Live Verification
 

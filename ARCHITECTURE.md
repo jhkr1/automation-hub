@@ -456,7 +456,8 @@ TrendInsight
 - **Dependency Injection**: `TrendEnricher`는 Provider와 Generator를 생성자로 받아 테스트 대체 구현을 허용함
 - **Implemented**: `TrendEnricher.enrich(trend) -> TrendInsight`
 - **Implemented**: 뉴스 호출 limit 전달, 빈 기사 전달, reason trim·타입·빈 값·최대 300자 검증
-- **Not implemented**: TrendInsight 저장, Scheduler, retry, cache, CLI
+- **Implemented**: `JsonTrendInsightStorage`가 `TrendInsight` 목록을 JSON으로 저장함
+- **Not implemented**: Scheduler, retry, cache, CLI
 
 Known Limitation:
 
@@ -464,7 +465,7 @@ Known Limitation:
 - `TrendPipeline`은 Top10 개수나 rank를 재검증하지 않으며 Collector 계약을 신뢰함
 - 빈 뉴스 목록도 오류로 보정하지 않고 Gemini에 전달함
 - 뉴스 기사의 핵심 주제 여부는 Prompt 지침에 의존하며 별도 분류기는 없음
-- `TrendInsight` 저장 형식과 장기 누적 정책은 아직 결정하지 않음
+- JSON 저장은 현재 파일을 overwrite하며 장기 누적 정책은 아직 결정하지 않음
 
 ## 7. Executable Project Harness
 
@@ -608,9 +609,9 @@ Point와 결과 저장이 남아 있습니다. 권장 순서는 책임을 섞지
 
 1. **완료: Top10 Batch Orchestrator**: `TrendPipeline`이 Collector의 `list[TrendItem]`을
    순회하여 `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
-2. **Enriched Output Contract**: `TrendInsight`와 뉴스 목록을 보존할 출력 형식과 기존
-   TrendItem CSV의 호환 정책을 결정함.
-3. **TrendInsight Storage**: 확정된 계약에 따라 Enriched 결과를 저장함.
+2. **완료: Enriched Output Contract**: JSON 최상위 구조, schema version, 시간·encoding,
+   overwrite 정책을 확정함.
+3. **완료: TrendInsight Storage**: 확정된 JSON 계약에 따라 Enriched 결과를 저장함.
 4. **Application Entry Point**: Collector, Batch Orchestrator, Storage를 단일 실행 명령으로
    연결함. Scheduler는 포함하지 않음.
 5. **전체 Pipeline Live Verification**: 실제 Top10 1회 실행으로 수집·뉴스·Gemini·저장을
@@ -618,3 +619,62 @@ Point와 결과 저장이 남아 있습니다. 권장 순서는 책임을 섞지
 
 각 단계의 구현 전에는 실제 소비 요구와 실패 정책을 확인하며, 확인되지 않은 저장 형식이나
 운영 방식을 추측하여 선행 구현하지 않습니다.
+
+## 10. Enriched Output Contract and Storage
+
+`TrendItem` 원본 CSV와 Enriched 결과 파일의 소비 목적이 다르므로 저장 계층을 분리합니다.
+기존 CSV 계약은 `rank,keyword,href`로 유지하고, `TrendInsight` 목록은 JSON으로 저장합니다.
+
+### 10.1 JSON 계약
+
+```json
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-29T12:30:00+00:00",
+  "insights": [
+    {
+      "trend": {
+        "rank": 1,
+        "keyword": "...",
+        "href": "..."
+      },
+      "reason": "...",
+      "articles": [
+        {
+          "title": "...",
+          "url": "...",
+          "source": "...",
+          "published_at": "..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `schema_version`: 정수 `1`. 필드 계약 변경 시 호환성 판단 기준으로 사용함
+- `generated_at`: Storage clock이 반환한 timezone-aware datetime의 ISO 8601 문자열
+- datetime 필드: `published_at`은 ISO 8601 문자열이며 `None`은 JSON `null`로 저장함
+- encoding: UTF-8, `ensure_ascii=False`
+- formatting: 사람이 확인할 수 있도록 JSON indentation 2칸 사용
+- 순서: 입력 Insight와 각 Insight의 articles 순서를 그대로 보존함
+- 빈 목록: `insights: []`인 유효한 JSON으로 저장함
+
+### 10.2 Storage 책임과 파일 정책
+
+`JsonTrendInsightStorage.save(insights, path) -> Path`는 모델을 명시적으로 JSON 객체로
+매핑하고 파일 I/O만 담당합니다. Collector, Pipeline, Enricher, 환경변수, 파일명 자동
+생성 정책을 직접 다루지 않습니다.
+
+- 부모 디렉터리를 자동 생성함
+- 지정한 경로의 기존 파일은 overwrite함
+- 동일 디렉터리의 임시 파일에 JSON을 작성하고 `replace`하여 부분 파일 노출을 줄임
+- 입력 모델과 순서를 변경하지 않음
+- `TrendItem`, `NewsArticle`, `TrendInsight` 외 입력은 `TypeError`로 거부함
+- timezone-naive `generated_at`은 `ValueError`로 거부함
+
+### 10.3 Known Limitation
+
+- 파일은 overwrite되며 append·날짜별 보관·장기 누적은 구현하지 않음
+- JSON을 `TrendPipeline`에 연결하는 Application Entry Point는 아직 없음
+- JSON schema migration과 backward compatibility는 `schema_version`만 정의된 상태임
