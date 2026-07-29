@@ -85,13 +85,20 @@
 1. 설계
 2. 최소 범위 구현
 3. 테스트 추가 또는 수정
-4. `ruff check .` 실행
-5. `pytest -q` 실행
-6. `python -m compileall namuwiki_trend tests` 실행
-7. 관련 문서 업데이트
-8. `git diff --check` 실행
-9. `git diff`와 `git status` 재확인
-10. 커밋
+4. 관련 문서 업데이트
+5. `python scripts/verify.py` 실행
+6. `git diff`와 `git status` 재확인
+7. 커밋
+
+### Verification Rule
+
+Before completion run:
+
+```bash
+python scripts/verify.py
+```
+
+세부 검증 명령과 실패 처리는 `scripts/verify.py`가 담당한다.
 
 ### 완료 후 확인사항
 
@@ -212,8 +219,7 @@ AI는 실제 구현된 코드와 검증 결과만 근거로 판단한다.
 - 기존 사용자 변경사항과 충돌함
 - 데이터 손실 또는 비가역적 변경 가능성이 있음
 
-중단 시 확인한 사실, 확인하지 못한 사실, 중단 이유와 사용자에게 필요한 결정을 함께 보고한다.
-추측으로 구현하여 Stop Rule을 우회하지 않는다.
+중단 시 확인한 사실·중단 이유·사용자 결정을 보고하며 추측으로 우회하지 않는다.
 
 ## 7. Testing Rule
 
@@ -251,13 +257,7 @@ Sprint별 구현 내용, 검증 결과, 문제, 해결 과정과 미해결 사�
 
 ## 9. Git Rule
 
-작업 전후에 다음을 확인한다.
-
-```bash
-git status --short --branch
-git diff --check
-git diff
-```
+작업 전후에 `git status`, `git diff --check`, `git diff`를 확인한다.
 
 - 기존 변경사항을 임의로 삭제하지 않는다.
 - 관련 없는 파일을 커밋하지 않는다.

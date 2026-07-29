@@ -458,6 +458,27 @@ Known Limitation:
 - 뉴스 기사의 핵심 주제 여부는 Prompt 지침에 의존하며 별도 분류기는 없음
 - `TrendInsight` 저장 형식과 장기 누적 정책은 아직 결정하지 않음
 
+## 8. Executable Project Harness
+
+현재 프로젝트 Harness는 문서 규칙과 실행 도구를 다음처럼 분리합니다.
+
+- `AGENTS.md`: AI가 항상 따르는 프로젝트 불변 규칙과 실행 진입점 안내
+- `scripts/verify.py`: 검증 명령의 순서, 실패 중단, non-zero 반환, 성공 메시지 담당
+- Ruff: 정적 품질 검사 담당
+- Pytest: 단위·통합 경계 테스트 담당
+- Compileall: Python 파일 컴파일 가능 여부 담당
+- Git Rule: diff 검토, 명시적 stage, 커밋, push 금지 정책 담당
+
+표준 검증 진입점은 다음 하나입니다.
+
+```bash
+python scripts/verify.py
+```
+
+`verify.py`는 Ruff, Pytest, Compileall, `git diff --check`를 순서대로 실행하며 하나라도
+실패하면 즉시 중단합니다. Harness 자체 테스트는 Fake runner를 사용해 성공·실패 흐름을
+검증하고 실제 외부 API나 검증 명령에 의존하지 않습니다.
+
 공식 참고 문서:
 
 - [Gemini API 시작하기](https://ai.google.dev/gemini-api/docs/generate-content/get-started)
