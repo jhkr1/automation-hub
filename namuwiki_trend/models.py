@@ -8,6 +8,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 
+@dataclass(frozen=True)
+class TrendItem:
+    """나무위키 실시간 검색어 순위 항목."""
+
+    rank: int
+    keyword: str
+    href: str
+
+
 @dataclass
 class TrendKeyword:
     """나무위키에서 수집한 인기 검색어 1건."""
