@@ -1,0 +1,32 @@
+[project]
+name = "automation-hub"
+version = "0.1.0"
+description = "데이터 수집 자동화 허브 — 나무위키 트렌드, Google Finance 등"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32",
+    "beautifulsoup4>=4.12",
+    "google-genai>=1.0",
+    "openpyxl>=3.1",
+    "pydantic-settings>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "playwright>=1.61",
+]
+
+[tool.setuptools.packages.find]
+include = ["namuwiki_trend*", "google_finance*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
