@@ -72,6 +72,29 @@
 어떤 대안도 모든 상황에서 우월하다고 판단하지 않습니다. 선택은 데이터가 생성되는 위치,
 운영 환경, 유지보수 방식, 테스트 요구사항에 따라 달라집니다.
 
+비교 시 다음 기준을 함께 고려했습니다.
+
+- 동적 DOM 처리
+- 대기 전략과 Locator 사용 방식
+- 브라우저 및 드라이버 관리
+- 세션 격리
+- 네트워크 관찰과 디버깅
+- 실제 브라우저 호환성
+- Selenium Grid 또는 기존 기업 자산 활용 가능성
+- 테스트 작성 경험
+- 현재 프로젝트에서의 전환 비용
+
+Playwright는 Locator 중심 API, auto-wait, `BrowserContext` 기반 세션 격리,
+Chromium·Firefox·WebKit 지원, trace 및 request/response 관찰 기능을 제공합니다.
+대신 Playwright 버전과 브라우저 바이너리를 함께 관리해야 하며, Linux 시스템 의존성 설치가
+필요할 수 있습니다.
+
+Selenium은 W3C WebDriver 기반으로 Chrome, Edge, Firefox, Safari 등 브라우저 생태계와
+Selenium Grid 및 기존 기업 자산을 활용할 수 있습니다. Selenium Manager로 드라이버 관리
+부담은 과거보다 줄었지만, 대기 조건은 explicit wait 중심으로 설계해야 합니다.
+이번 프로젝트에서는 Selenium을 실행하여 비교하지 않았으므로 Selenium의 실제 실행 시간이나
+동일 Locator의 안정성은 `확인하지 못함`으로 기록합니다.
+
 ### 5.4 현재 프로젝트 제약
 
 - Python 3.12 기반 flat layout을 유지함
@@ -104,6 +127,18 @@
 
 현재 `namuwiki_trend`의 수집 방식으로 Python Playwright를 선택합니다.
 
+- **Verified**: Headless/Headed 환경과 대상 DOM을 반복 검증함
+- **Implemented**: `collect_trends() -> list[TrendItem]` 운영 Collector 구현 완료
+- **Implemented**: `collector.py`는 Playwright 실행·페이지 접속·원시 DOM 수집을 담당함
+- **Implemented**: `extraction.py`는 sentinel 검증·제거, keyword/href 검증, 정확히 10개 검증,
+  rank 부여를 담당함
+- **Implemented**: `models.py`는 `TrendItem`을 정의함
+- **Implemented**: `playwright_poc.py`는 Collector 수동 실행과 결과 확인만 담당함
+- **Implemented**: Collector 및 순수 추출 테스트 21개 통과
+- **Planned**: 수집 결과 저장
+- **Rejected for now**: XLSX 저장, Database 저장, Scheduler, CLI,
+  Logging framework, retry, fallback locator
+
 선택 이유는 일반적인 선호가 아니라 다음 현재 조건 때문입니다.
 
 1. 데이터가 초기 HTML이 아닌 렌더링된 DOM에서 확인됨
@@ -130,15 +165,50 @@ Playwright는 DOM에서 원시 항목을 읽고, sentinel·개수·rank 검증�
 - XLSX: 사람이 읽고 필터링하는 보고서에 적합함
 - Database: 장기 누적, 조회, 무결성, 동시성 요구가 있을 때 적합함
 
-현재 Sprint에서는 저장 기능을 구현하거나 형식을 선택하지 않았습니다.
+현재 저장 기능은 아직 구현하지 않았습니다.
 
-### 5.9 향후 재검토 조건
+- **Planned**: 첫 저장 기능은 CSV로 구현함
+- **선택 근거**: 현재 데이터가 `rank`, `keyword`, `href`로 구성된 단순 tabular data이고,
+  저장 파이프라인 검증에 서식이나 여러 Sheet가 필요하지 않으며, 추가 외부 의존성 없이 구현할 수 있음
+- **Rejected for now**: XLSX와 Database는 현재 요구사항에 필요한 조건이 확인되지 않음
+
+### 5.9 저장 형식 재검토 조건
 
 다음 조건이 확인되면 수집 방식을 다시 검토합니다.
 
-- 초기 HTML 또는 공식 API에서 동일한 Top10과 순위를 안정적으로 제공함
-- 현재 locator 또는 DOM 구조가 반복 실행에서 더 이상 유지되지 않음
-- Headless 실행 시간·메모리 사용량이 운영 주기를 충족하지 못함
-- Chromium 설치와 시스템 의존성이 배포 환경의 제약과 충돌함
-- Selenium 또는 다른 도구가 동일한 Evidence를 더 낮은 유지보수 비용으로 제공함
-- 장기 저장 요구가 생겨 CSV, XLSX, Database 중 하나의 목적별 선택이 필요해짐
+- XLSX: 비개발자가 파일을 직접 소비하거나, 필터·정렬·여러 Sheet·차트·조건부 서식이 필요함
+- Database: 데이터가 장기 누적되고, 중복 방지·무결성·기간별 조회·동시 쓰기가 필요함
+- SQLite/PostgreSQL: 여러 Collector 결과를 통합하거나 조회 요구가 커짐
+
+### 5.10 Automation Anywhere와 Python 재구현의 의미
+
+Automation Anywhere와 Python은 우열을 비교하기 위한 대상이 아니라, 같은 업무를 서로 다른
+실행 모델로 해결하며 차이를 분석하기 위한 대상입니다.
+
+Automation Anywhere는 화면 기반 구성, 기업용 credential·scheduler·bot runner,
+중앙 모니터링 환경이 이미 있는 경우에 적합할 수 있습니다. 라이선스와 플랫폼 종속성,
+코드 단위 테스트와 세밀한 Git 버전 관리의 비용도 함께 고려해야 합니다.
+
+Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데이터 처리 생태계,
+세밀한 오류 처리를 활용할 수 있습니다. 반면 실행 환경·의존성·배포를 직접 관리해야 하며,
+비개발자에게는 흐름이 덜 시각적일 수 있습니다.
+
+현재 Python 재구현의 목적은 Automation Anywhere보다 우월함을 증명하는 것이 아닙니다.
+다음 내용을 학습하고 검증하기 위한 재구현입니다.
+
+- 브라우저 자동화 내부 동작
+- DOM 분석
+- 데이터 모델링
+- 책임 분리
+- 자동화 테스트
+- Git 기반 개발 흐름
+
+### 5.11 브라우저 자동화 재검토 조건
+
+- **Reconsider when**: 정적 HTML 또는 검증된 API가 동일한 Top10을 안정적으로 제공함
+- **Reconsider when**: 조직 표준이 Selenium이고 Selenium Grid 또는 기존 테스트 자산 재사용이 필요함
+- **Reconsider when**: Safari 실브라우저 검증이 핵심 요구가 됨
+- **Reconsider when**: 팀 운영 경험이 Selenium에 집중되어 전환 비용이 낮아짐
+- **Reconsider when**: Playwright의 브라우저 실행 시간·메모리·Linux 시스템 의존성이 운영 제약을 초과함
+
+위 조건이 발생하면 Selenium 또는 requests 기반 방식을 새 Evidence로 검증한 후 재결정합니다.
