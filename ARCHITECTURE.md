@@ -20,7 +20,7 @@
 - **이유**: 각 모듈의 코드가 100줄 이내로 매우 짧습니다. 서브 디렉토리를 깊게 파는 것은 오히려 불필요한 `__init__.py`를 양산하고 임포트 경로만 복잡하게 만듭니다.
 
 ### `src/` 레이아웃 배제
-- **이유**: `src/` 구조는 PyPI 등 외부에 라이브러리를 배포할 때 유용합니다. 우리는 파이프라인을 실행(`python -m namuwiki_trend.main`)하는 것이 목적이므로, 실행 스크립트 중심의 구조가 더 직관적입니다.
+- **이유**: `src/` 구조는 PyPI 등 외부에 라이브러리를 배포할 때 유용합니다. 현재는 flat layout의 모듈과 `scripts/verify.py`를 기준으로 개발합니다. 단일 실행 Entry Point는 Planned입니다.
 
 ## 3. 다른 방법과의 비교
 
@@ -224,16 +224,22 @@ Python은 Git diff와 코드 리뷰, 함수 단위 테스트, Playwright 및 데
 
 ### 6.1 목표와 현재 상태
 
-현재 수집 파이프라인은 다음과 같습니다.
+현재 구현된 수집·enrichment 경계는 다음과 같습니다.
 
     Playwright Collector
     ↓
     list[TrendItem]
-    ↓
-    CSV 저장
+    ├── CSV 저장
+    └── TrendEnricher.enrich(trend)
+            ↓
+    NewsContextProvider → list[NewsArticle]
+            ↓
+    GeminiReasonGenerator → reason
+            ↓
+    TrendInsight
 
-현재 단계에서는 각 검색어와 최신 뉴스 문맥을 근거로 왜 실시간 검색어인지 1~2줄로
-설명하는 LLM 생성 계층을 검증합니다.
+Collector와 TrendEnricher를 연결하는 Top10 전체 Application Pipeline은 아직 구현되지
+않았습니다.
 
 - **Implemented**: Collector는 `list[TrendItem]`만 반환함
 - **Implemented**: CSV 저장은 `TrendItem`만 입력으로 받음
@@ -304,7 +310,7 @@ Enrichment 결과임을 명확히 표현할 수 있다는 점입니다. 단점�
 - `collector.py`: 브라우저 수집과 순위 검증만 담당함
 - `extraction.py`: sentinel, 개수, keyword/href, rank 규칙만 담당함
 - `csv_storage.py`: 현재 `TrendItem` 원본을 CSV로 직렬화함
-- Reason Generator: TrendItem을 설명 생성 입력으로 변환하고 결과를 TrendInsight와 결합함
+- `enricher.py`: TrendItem 하나에 대해 Provider와 Generator를 호출하고 TrendInsight를 생성함
 - Gemini Provider: Gemini API 호출과 응답 처리를 담당함
 - `TrendInsight`: 원본 TrendItem과 생성된 reason을 함께 표현함
 
@@ -458,7 +464,7 @@ Known Limitation:
 - 뉴스 기사의 핵심 주제 여부는 Prompt 지침에 의존하며 별도 분류기는 없음
 - `TrendInsight` 저장 형식과 장기 누적 정책은 아직 결정하지 않음
 
-## 8. Executable Project Harness
+## 7. Executable Project Harness
 
 현재 프로젝트 Harness는 문서 규칙과 실행 도구를 다음처럼 분리합니다.
 
@@ -485,15 +491,15 @@ python scripts/verify.py
 - [Gemini 3.5 Flash 모델 ID](https://ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.5)
 - [Gemini API Key 사용](https://ai.google.dev/gemini-api/docs/generate-content/api-key)
 
-## 7. 최신 뉴스 문맥 Provider PoC
+## 8. 최신 뉴스 문맥 Provider PoC
 
-### 7.1 해결하려는 문제
+### 8.1 해결하려는 문제
 
 `TrendItem.keyword`만으로는 검색어가 실시간 검색어 순위에 오른 최신 사건을 확인하기
 어렵습니다. 이번 단계의 범위는 검색어 하나에 대한 최신 뉴스 제목·URL·출처·게시 시각을
 가져올 수 있는지 검증하는 것이며, Gemini enrichment와의 연결은 포함하지 않습니다.
 
-### 7.2 검토한 후보
+### 8.2 검토한 후보
 
 | 후보 | 장점 | 단점 및 확인 상태 |
 |---|---|---|
@@ -507,7 +513,7 @@ python scripts/verify.py
 에서 Publisher Center 제출 RSS/web location 흐름이 변경되었다고 안내하므로, 이번 구현의
 Google News RSS 주소를 공식적인 안정 API 계약으로 해석하지 않습니다.
 
-### 7.3 최종 선택과 이유
+### 8.3 최종 선택과 이유
 
 이번 PoC에서는 Google News RSS 검색을 선택했습니다.
 
@@ -516,13 +522,13 @@ Google News RSS 주소를 공식적인 안정 API 계약으로 해석하지 않�
 - **테스트성**: XML parser를 순수 함수로 분리하고 HTTP client를 주입할 수 있음
 - **비용**: 이미 설치된 `requests`와 Python 표준 XML parser만 사용하며 새 의존성을 추가하지 않음
 - **Verified**: RSS XML 파싱, trim, 필수 필드, URL, 출처, 게시 시각, 중복 제거, limit을 Unit Test로 검증함
-- **Live Verified**: 이 Commit에서는 자동 또는 수동 Live 호출을 실행하지 않음
+- **Live Verified**: 초기 Provider PoC에서는 자동 Live 호출을 실행하지 않았으며, 이후 별도 Live 검증에서 확인함
 
 이는 Google News RSS가 장기 운영에 절대적으로 적합하다는 의미가 아닙니다. 현재 목표인
 키워드 하나의 뉴스 문맥 확보 PoC에 대한 선택이며, 공개 feed의 계약·호출 제한·결과 품질은
 운영 전 추가 검증이 필요합니다.
 
-### 7.4 데이터 흐름
+### 8.4 데이터 흐름
 
 ```text
 keyword: str
@@ -549,12 +555,12 @@ title과 HTTP(S) 절대 URL은 필수입니다. source와 pubDate가 없거나 p
 없으면 선택 필드를 `None`으로 둡니다. 같은 URL은 최초 항목만 보존하고, 중복 제거 후
 앞에서부터 `limit`개를 반환합니다. HTTP 예외는 원인 보존을 위해 그대로 전달합니다.
 
-### 7.5 구현 범위와 실행 방법
+### 8.5 구현 범위와 실행 방법
 
 - **Implemented**: `models.py`에 뉴스 문맥용 `NewsArticle` 모델 추가
 - **Implemented**: `news_context_provider.py`의 `NewsContextProvider.search()`와 순수 RSS parser
 - **Implemented**: `news_context_poc.py`에 검색어 `손흥민` 하나를 조회하는 수동 실행 경로 추가
-- **Not changed**: Collector, 기존 CSV, Gemini Provider, TrendInsight, CLI, Scheduler
+- **Not changed in the initial PoC**: Collector, 기존 CSV, CLI, Scheduler
 - **Not implemented**: retry, cache, batch 처리, 브라우저 HTML 수집
 
 Live 확인은 자동 테스트에 포함하지 않습니다. 사용자가 직접 다음 명령을 실행합니다.
@@ -566,7 +572,7 @@ python -m namuwiki_trend.news_context_poc
 스크립트는 결과 개수, 제목, 출처, 게시 시각, URL, 호출 시간을 출력합니다. 이 명령을
 실행하지 않은 상태에서는 Live Verified로 기록하지 않습니다.
 
-### 7.6 알려진 한계와 재검토 조건
+### 8.6 알려진 한계와 재검토 조건
 
 - Google News RSS의 공개 feed URL은 공식 소비자 검색 API 계약으로 확인되지 않았습니다.
 - 검색 결과가 나무위키 실시간 검색어의 실제 등재 원인을 증명하지는 않습니다.
@@ -577,12 +583,12 @@ python -m namuwiki_trend.news_context_poc
 - Google RSS 계약 변경, 빈 결과 증가, HTTP 차단 또는 운영 SLA 요구가 확인되면 네이버 API,
   출처별 RSS, 승인된 다른 뉴스 API를 새 Evidence로 비교합니다.
 
-### 7.7 향후 Gemini 연결 계획
+### 8.7 후속 Gemini 연결 참고
 
-다음 단계에서 `list[NewsArticle]`를 근거 문맥으로 Reason Generator에 선택적으로 전달할 수
-있습니다. 뉴스 Provider는 Collector를 호출하지 않으며, Gemini Provider도 뉴스 검색을
-직접 수행하지 않습니다. 실제 연결 전에는 기사 제목을 사실의 증거로 사용할 범위, 출처·시각
-표시, 뉴스가 없을 때의 응답, LLM 생성 품질을 별도 테스트해야 합니다.
+현재 `list[NewsArticle]`는 `TrendEnricher`를 통해 Reason Generator에 전달됩니다. 뉴스
+Provider는 Collector를 호출하지 않으며, Gemini Provider도 뉴스 검색을 직접 수행하지
+않습니다. 기사 제목을 사실의 증거로 사용하는 범위, 출처·시각 표시, 뉴스가 없을 때의
+응답, LLM 생성 품질은 별도 테스트와 Live 검증 대상입니다.
 
 검증 명령:
 
@@ -592,3 +598,21 @@ pytest -q
 python -m compileall namuwiki_trend tests
 git diff --check
 ```
+
+## 9. MVP Roadmap
+
+현재 MVP는 단일 `TrendItem` enrichment까지 구현되었으며, Top10 전체 실행과 결과 저장이
+남아 있습니다. 권장 순서는 책임을 섞지 않는 다음 단계입니다.
+
+1. **Top10 Batch Orchestrator**: Collector의 `list[TrendItem]`을 순회하여
+   `list[TrendInsight]`를 반환함. 저장은 포함하지 않음.
+2. **Enriched Output Contract**: `TrendInsight`와 뉴스 목록을 보존할 출력 형식과 기존
+   TrendItem CSV의 호환 정책을 결정함.
+3. **TrendInsight Storage**: 확정된 계약에 따라 Enriched 결과를 저장함.
+4. **Application Entry Point**: Collector, Batch Orchestrator, Storage를 단일 실행 명령으로
+   연결함. Scheduler는 포함하지 않음.
+5. **전체 Pipeline Live Verification**: 실제 Top10 1회 실행으로 수집·뉴스·Gemini·저장을
+   검증함.
+
+각 단계의 구현 전에는 실제 소비 요구와 실패 정책을 확인하며, 확인되지 않은 저장 형식이나
+운영 방식을 추측하여 선행 구현하지 않습니다.

@@ -1,89 +1,131 @@
 # automation-hub
 
-데이터 수집 자동화 허브 — 여러 소스에서 데이터를 수집하고 분석하여 Excel로 저장합니다.
-현재 나무위키 실시간 검색어 순위(Top 10)를 주기적으로 수집하고 활용하는 기능과 Google Finance 종목 시세 수집 기능을 하나의 저장소(모노레포)에서 관리하고 있습니다.
+Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프로젝트는 독립 패키지로 관리하며,
+현재 `namuwiki_trend`와 `google_finance`의 설정·모델 뼈대가 있습니다.
 
-## 프로젝트 구조
+## 현재 구현된 기능
 
+`namuwiki_trend`에서 실제로 구현된 기능은 다음과 같습니다.
+
+- Playwright 기반 나무위키 실시간 검색어 Top 10 수집
+- `TrendItem` 모델과 rank 보존
+- `TrendItem` CSV 저장
+- Google News RSS 기반 뉴스 문맥 검색
+- `NewsArticle` 모델
+- 뉴스 문맥을 사용하는 Gemini Prompt grounding
+- Gemini `gemini-3.5-flash` 기반 reason 생성
+- 단일 `TrendItem` enrichment와 `TrendInsight` 생성
+- 외부 명령을 통합 실행하는 verification Harness
+
+`google_finance`는 현재 `config.py`와 `models.py`만 구현되어 있습니다.
+
+## 현재 Pipeline
+
+실제 구현된 데이터 흐름은 다음과 같습니다.
+
+```text
+Playwright Collector
+        ↓
+list[TrendItem]
+        ├── save_trends_to_csv()
+        └── TrendEnricher.enrich(trend)
+                ↓
+        NewsContextProvider
+                ↓
+        list[NewsArticle]
+                ↓
+        GeminiReasonGenerator
+                ↓
+        TrendInsight
 ```
-automation-hub/
-├── namuwiki_trend/    # 나무위키 실시간 검색어 순위(Top 10) 수집 및 요약
-├── google_finance/    # Google Finance 종목 시세 수집 및 요약
-├── tests/             # 테스트 코드
-├── output/            # 생성된 Excel 파일 저장 위치 (Git 미추적)
-├── logs/              # 애플리케이션 및 cron 실행 로그 (Git 미추적)
-└── scripts/           # 스케줄러 등록 등 운영 스크립트
-```
 
-## 기술 스택
+현재 `TrendEnricher`는 단일 `TrendItem`만 처리합니다. Collector와 TrendEnricher를 연결하는
+Top10 전체 Application Pipeline은 아직 구현되지 않았습니다.
 
-- **언어**: Python 3.12
-- **크롤링**: `requests`, `BeautifulSoup4`
-- **LLM 연동**: `google-genai` (Gemini 2.5 Flash 모델)
-- **데이터 저장**: `openpyxl` (Excel 파일 생성 및 쓰기)
-- **설정 관리**: `pydantic-settings` (.env 파일 타입 검증)
-- **개발 환경**: `pytest`, `ruff`
+## 개발 환경
 
-## 실행 방법
-
-### 1. 가상환경 생성
+Python 3.12 이상과 가상환경을 사용합니다.
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-### 2. 의존성 설치
-
-```bash
 pip install -e ".[dev]"
 ```
 
-### 3. 환경변수 설정
-
-저장소 루트에 `.env` 파일을 생성하고 아래 양식에 맞게 API 키를 입력합니다. (템플릿은 `.env.example`을 참고하세요)
+환경변수 템플릿을 복사한 뒤 필요한 값을 설정합니다.
 
 ```bash
 cp .env.example .env
 ```
 
-| 변수 | 설명 | 사용 프로젝트 |
-|:---|:---|:---|
-| `NAVER_CLIENT_ID` | 네이버 검색 API Client ID | namuwiki_trend |
-| `NAVER_CLIENT_SECRET` | 네이버 검색 API Client Secret | namuwiki_trend |
-| `GEMINI_API_KEY` | Google Gemini API Key | 공통 |
-| `STOCK_SYMBOLS` | 수집할 종목 코드 (쉼표 구분) | google_finance |
-| `LOG_LEVEL` | 로그 출력 레벨 (기본: INFO) | 공통 |
+`.env.example`에는 `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `GEMINI_API_KEY`,
+`STOCK_SYMBOLS`, `LOG_LEVEL`이 정의되어 있습니다. API Key와 실제 secret은 저장소에
+커밋하지 않습니다.
 
-### 4. 수동 실행
+## 검증
+
+프로젝트 표준 검증 명령은 다음 하나입니다.
 
 ```bash
-# 나무위키 실시간 검색어 순위(Top 10) 수집 파이프라인 1회 실행
-python -m namuwiki_trend.main
-
-# Google Finance 종목 시세 수집 파이프라인 1회 실행
-python -m google_finance.main
+python scripts/verify.py
 ```
 
-## 결과 예시 (예상 데이터)
+Harness는 Ruff, Pytest, Python compileall, `git diff --check`를 순서대로 실행합니다.
 
-실행이 완료되면 `output/` 디렉토리에 일자별 엑셀 파일이 생성됩니다.
-(예: `output/namuwiki_trend/2026-07-29.xlsx`)
+## Live Verification 상태
 
-| 수집시각 | 순위 | 키워드 | 관련 뉴스 | 인기 이유 (Gemini 요약) |
-|:---|:---|:---|:---|:---|
-| 10:00 | 1 | 파리 올림픽 | 대표팀 금메달 획득... | 최근 올림픽 경기에서 대표팀이 우수한 성적을 거두어 네티즌들의 관심이 집중되고 있습니다. |
+- `NewsContextProvider`: Live Verified
+- `GeminiReasonGenerator`: Live Verified
+- `TrendEnricher`: Unit Verified
+- 전체 Top10 Pipeline: 미구현
+- 전체 Pipeline Live Verification: 미수행
 
-## cron 등록 방법 (자동화)
-
-`scripts/setup_cron.sh` 스크립트를 사용하여 시스템 crontab에 스케줄러를 등록할 수 있습니다.
-이 스크립트는 `flock`을 활용하여 중복 실행을 방지합니다.
+단일 Provider PoC는 다음 명령으로 직접 실행할 수 있습니다.
 
 ```bash
-# 크론탭 일괄 등록
-bash scripts/setup_cron.sh
+python -m namuwiki_trend.news_context_poc
+python -m namuwiki_trend.playwright_poc
 ```
 
-**등록되는 스케줄:**
-- `namuwiki_trend`: 매 2시간마다 (0시, 2시, 4시...)
-- `google_finance`: 매일 오전 9시 30분, 오후 3시 30분 (한국 증시 기준)
+두 명령은 운영용 전체 Pipeline이 아니라 개별 기술 검증용 실행 경로입니다.
+
+## Planned / Not Implemented
+
+현재 다음 기능은 구현되지 않았습니다.
+
+- Top10 Batch Orchestrator
+- `TrendInsight` 저장
+- `namuwiki_trend.main`
+- `google_finance.main`
+- Scheduler와 Cron 설정
+- Retry와 Cache
+- Database 저장
+- Batch 병렬화
+
+따라서 위 기능을 실행하는 명령이나 운영 절차는 제공하지 않습니다.
+
+## MVP 완료 기준
+
+현재 프로젝트는 MVP 완료 전입니다. MVP는 다음 조건을 모두 만족해야 합니다.
+
+- 나무위키 실시간 검색어 Top 10 수집
+- 각 `TrendItem`의 뉴스 문맥 검색
+- Gemini reason 생성
+- `TrendInsight` 생성
+- Enriched 결과 파일 저장
+- 단일 명령 실행
+- 외부 네트워크 없는 Unit Test
+- 실제 전체 Pipeline Live Verification 1회
+- `python scripts/verify.py` 통과
+
+## Roadmap
+
+권장 구현 순서는 다음과 같습니다.
+
+1. Top10 Batch Orchestrator
+2. Enriched Output Contract
+3. `TrendInsight` Storage
+4. 단일 실행 Application Entry Point
+5. 전체 Pipeline Live Verification
+
+계층 책임과 상세 설계 결정은 [ARCHITECTURE.md](ARCHITECTURE.md)에 기록합니다.
