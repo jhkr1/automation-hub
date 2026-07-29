@@ -7,6 +7,7 @@ from namuwiki_trend.models import TrendItem
 RawItem = tuple[object, object]
 
 EXPECTED_ITEM_COUNT = 10
+HREF_PREFIX = "/Go?q="
 
 
 def _normalize_item(raw_item: RawItem, index: int) -> tuple[str, str]:
@@ -26,7 +27,7 @@ def _normalize_item(raw_item: RawItem, index: int) -> tuple[str, str]:
 
     if not isinstance(raw_href, str) or not raw_href:
         raise ValueError(f"항목 {index + 1}의 href가 비어 있거나 문자열이 아님: {raw_href!r}")
-    if not raw_href.startswith("/Go?q="):
+    if not raw_href.startswith(HREF_PREFIX):
         raise ValueError(f"항목 {index + 1}의 href 형식이 잘못됨: {raw_href}")
 
     return keyword, raw_href
