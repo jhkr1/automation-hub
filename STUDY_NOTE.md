@@ -1,890 +1,437 @@
-# Study Note
+# Software Engineering Handbook
 
-이 문서는 프로젝트를 진행하며 학습한 내용을 기술 서적 형태로 정리한다.
-단순한 작업 로그가 아니라 개념, 동작 원리, 실험 과정, 결과와 기술적 의사결정을 함께 기록한다.
+`automation-hub`를 처음부터 다시 읽으며 Python 기반 자동화 프로젝트의 설계, 구현,
+검증, 운영을 학습하기 위한 교재의 목차다.
 
-이 문서에서는 다음을 구분한다.
+이 문서는 Reference나 API Reference가 아니다. 각 Chapter의 본문은 다음 순서로 집필한다.
 
-- 프로젝트에서 확인한 사실: 실제 브라우저 조사와 저장소의 코드·문서를 통해 확인한 내용
-- 일반 지식: 웹, HTTP, Python 도구에 관한 일반적인 기술 개념
-- 판단: 확인한 사실을 바탕으로 내린 기술적 선택
+1. 왜 이 기술이 필요한가
+2. 어떤 문제를 해결하는가
+3. 핵심 개념
+4. 실무에서는 어떻게 사용하는가
+5. 이 프로젝트에서는 어디에 사용했는가
+6. 장점
+7. 단점
+8. 언제 사용하면 안 되는가
+9. 자주 하는 실수
+10. 다음 Chapter와 어떻게 연결되는가
 
-실제로 확인하지 못한 endpoint, payload, CSS selector와 HTML 세부 구조는 사실처럼 기록하지 않는다.
+## 독자와 학습 방법
 
-## 향후 개편 목차
+- 대상: Python을 조금 알고, Software Engineering을 체계적으로 배우려는 개발자
+- 목표: 문법 암기보다 설계 이유, 책임 경계, 검증 방법과 운영 trade-off를 이해함
+- 근거: 실제 코드, 테스트, 명령 결과, 공식 문서와 추론을 구분함
+- 프로젝트 연결: 각 Chapter는 실제 파일과 공개 계약을 반드시 참조함
+- 본문 집필 전: 관련 코드·테스트·문서를 다시 확인하고 현재 구현과 과거 결정을 구분함
 
-현재 본문은 기존 조사 기록으로 유지하고, 다음 Sprint부터 아래 순서의 학습서 구조로 재배치한다.
-각 Part는 `왜 배우는가 → 무엇을 해결하는가 → 이 프로젝트에서 어디에 사용했는가` 순서로
-작성한다. 이 Sprint에서는 목차와 연결 규칙만 정의하며 본문은 추가하지 않는다.
+## Handbook 전체 구성
 
-### Part 1. Python Backend
+| Part | 주제 | 역할 | 예상 분량 | 권장 난이도 |
+|---|---|---|---:|---|
+| 1 | Python Backend Foundations | Python 프로젝트를 읽고 작성하는 기반 | 35~45쪽 | 초급~중급 |
+| 2 | Software Architecture | 책임과 의존성의 구조화 | 40~50쪽 | 중급 |
+| 3 | Web Crawling and Browser Automation | 웹 데이터가 생성되는 위치를 검증하고 수집 | 45~55쪽 | 중급 |
+| 4 | AI Integration | LLM을 별도 Provider로 연결하고 근거를 통제 | 40~50쪽 | 중급 |
+| 5 | Testing and Quality Engineering | 실패를 재현하고 품질을 관찰 | 40~50쪽 | 중급 |
+| 6 | DevOps and Operations | 검증, 배포, cron 운영과 장애 확인 | 35~45쪽 | 중급 |
+| 7 | Case Study: namuwiki_trend | Sprint 순서로 전체 프로젝트 재구성 | 50~70쪽 | 종합 |
 
-- Python 문법과 타입
-- dataclass와 데이터 계약
-- 예외 처리와 의존성 주입
-- 프로젝트 적용: `models.py`, Provider, Application Layer
+예상 본문 분량은 약 285~365쪽이며, 현재 Sprint에서는 목차만 설계한다.
 
-### Part 2. Software Architecture
+---
 
-- 계층 분리와 책임 경계
-- Composition Root와 Pipeline
-- Provider 교체 가능성
-- 프로젝트 적용: Collector → Enricher → Storage
+# Part 1. Python Backend Foundations
 
-### Part 3. Web Crawling
+Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드로 연결하는 Part다.
 
-- HTTP와 HTML
-- View Source와 DOM
-- DevTools Network 분석
-- 브라우저 자동화와 Locator
-- 프로젝트 적용: Playwright Top10 Collector
+## Chapter 1. Python 프로젝트를 읽는 법
 
-### Part 4. AI Integration
+- 난이도: 초급
+- 선행 지식: Python 파일 실행과 기본 문법
+- 학습 목표: 모듈, 패키지, import, 공개 API와 파일 구조를 구분함
+- 예상 읽기 시간: 25분
+- 연결 코드: `namuwiki_trend/__init__.py`, `config.py`, `models.py`
 
-- LLM Provider와 Prompt Builder
-- Grounding과 근거 제한
-- Rate Limiting과 Bounded Retry
-- 프로젝트 적용: Gemini reason 생성
+## Chapter 2. Virtual Environment와 의존성
 
-### Part 5. Testing
+- 난이도: 초급
+- 선행 지식: 터미널 기본 명령
+- 학습 목표: `.venv`, Python interpreter, 재현 가능한 설치의 필요성을 이해함
+- 예상 읽기 시간: 30분
+- 연결 코드: `.venv/`, `pyproject.toml`, `.gitignore`
 
-- 순수 함수 테스트
-- Fake와 Dependency Injection
-- 계약 테스트와 Quality Diagnostics
-- Live Verification과 Unit Verification의 경계
+## Chapter 3. `pyproject.toml`과 Package 설계
 
-### Part 6. DevOps
+- 난이도: 초급~중급
+- 선행 지식: Package와 Module
+- 학습 목표: 프로젝트 metadata, dependencies, dev dependencies와 flat layout을 설계함
+- 예상 읽기 시간: 35분
+- 연결 코드: `pyproject.toml`, `namuwiki_trend/`, `google_finance/`
 
-- 가상환경과 의존성 관리
-- Ruff, Pytest, Compileall Harness
-- Git Workflow
-- WSL, cron, Wrapper, flock, 로그 운영
+## Chapter 4. Type Hint와 데이터 계약
 
-### Part 7. Case Study: namuwiki_trend
+- 난이도: 중급
+- 선행 지식: 함수와 class
+- 학습 목표: Type Hint가 협업 계약과 오류 발견에 미치는 영향을 이해함
+- 예상 읽기 시간: 35분
+- 연결 코드: `models.py`, `pipeline.py`, `enricher.py`
 
-- 문제 정의와 기술 조사
-- Sprint별 구현과 검증
-- 데이터 품질 문제와 진단
-- MVP 운영 구조와 Known Limitation
+## Chapter 5. `dataclass`, 불변성, `Pathlib`
 
-# Chapter: 나무위키 실시간 검색어 분석
+- 난이도: 중급
+- 선행 지식: class, 타입, 파일 경로
+- 학습 목표: 모델 불변성, 명시적 데이터 구조와 플랫폼 독립 경로 처리를 사용함
+- 예상 읽기 시간: 40분
+- 연결 코드: `models.py`, `insight_storage.py`, `main.py`
 
-## 1. 문제 정의
+## Chapter 6. Exception과 Logging
 
-### 1.1 프로젝트 목표
+- 난이도: 중급
+- 선행 지식: 함수 호출과 파일·네트워크 오류
+- 학습 목표: 예외를 숨기지 않고 경계별로 전달·기록하는 방법을 설계함
+- 예상 읽기 시간: 40분
+- 연결 코드: `collector.py`, `news_context_provider.py`, `main.py`, `config.py`
 
-이 프로젝트의 목표는 나무위키 실시간 검색어 순위 1~10위를 주기적으로 수집하고 활용하는 것이다.
+---
 
-수집 데이터의 핵심은 검색어 문자열만이 아니라 순위이다.
-따라서 각 항목은 다음 정보를 보존해야 한다.
+# Part 2. Software Architecture
 
-- rank: 실시간 검색어 순위
-- keyword: 검색어
-- collected_at: 수집 시각
+작은 Python 스크립트를 교체 가능하고 테스트 가능한 Application으로 만드는 Part다.
 
-현재 데이터 모델에는 TrendKeyword dataclass가 있으며 rank, keyword, collected_at 필드를 사용한다.
+## Chapter 7. 책임 분리와 계층 구조
 
-### 1.2 수집 목적
+- 난이도: 중급
+- 선행 지식: Part 1
+- 학습 목표: Model, Provider, Application, Storage의 변경 이유를 분리함
+- 예상 읽기 시간: 40분
+- 연결 코드: `collector.py`, `enricher.py`, `pipeline.py`, `insight_storage.py`
 
-실시간 검색어 순위는 특정 시점에 사람들이 어떤 주제에 관심을 보이는지 관찰할 수 있는 시계열 데이터가 될 수 있다.
-주기적으로 수집하면 다음 활용을 검토할 수 있다.
+## Chapter 8. Interface와 Protocol
 
-- 시간대별 순위 변화 확인
-- 특정 검색어의 등장과 하락 추적
-- 다른 데이터 소스와의 상관관계 분석
-- 수집 시점별 보고서 생성
+- 난이도: 중급
+- 선행 지식: Type Hint, 객체의 행동 계약
+- 학습 목표: 구체 클래스가 아닌 필요한 동작에 의존하는 구조를 이해함
+- 예상 읽기 시간: 35분
+- 연결 코드: `pipeline.py`, `enricher.py`, `main.py`
 
-현재 기록하는 내용은 수집 방식에 대한 조사와 기술 선택이다.
-실제로 구현된 활용 기능과 앞으로 구현할 기능은 구분한다.
+## Chapter 9. Dependency Injection과 Composition Root
 
-### 1.3 기존 RPA와 Python 프로젝트의 차이
+- 난이도: 중급
+- 선행 지식: Interface와 생성자
+- 학습 목표: 의존성 생성 위치와 주입 위치를 분리하고 Fake를 연결함
+- 예상 읽기 시간: 40분
+- 연결 코드: `main.py`, `pipeline.py`, `tests/namuwiki_trend/test_main.py`
 
-AA와 같은 RPA 도구는 브라우저 화면에서 사용자의 행동을 재현하는 데 강점이 있다.
-반면 이 프로젝트는 주기 실행, 테스트, 데이터 모델링, 로그 관리와 패키지 확장을 Python 코드로 관리하는 것을 목표로 한다.
+## Chapter 10. Pipeline과 Application Orchestration
 
-RPA와 Python은 문제의 성격에 따라 선택하는 도구이다.
-이번 조사에서는 화면의 최종 렌더링 결과를 읽어야 하지만, 장기적으로 코드·테스트·패키지 구조를 관리해야 하므로 Python 기반 자동화를 선택했다.
+- 난이도: 중급
+- 선행 지식: 계층 분리, DI
+- 학습 목표: 순서 보존, fail-fast, 빈 결과 정책을 Application Layer에 표현함
+- 예상 읽기 시간: 40분
+- 연결 코드: `pipeline.py`, `enricher.py`, `main.py`
 
-## 2. 초기 가설
+## Chapter 11. Repository·Storage Pattern과 Output Contract
 
-### 2.1 가설
+- 난이도: 중급
+- 선행 지식: dataclass, 파일 I/O
+- 학습 목표: 원본 CSV와 Enriched JSON의 소비 목적을 분리하고 schema를 관리함
+- 예상 읽기 시간: 40분
+- 연결 코드: `csv_storage.py`, `insight_storage.py`, `ARCHITECTURE.md`
 
-처음에는 requests로 나무위키 페이지를 요청하고 BeautifulSoup로 HTML을 파싱하면
-실시간 검색어를 수집할 수 있을 것으로 예상했다.
+## Chapter 12. Clean Architecture와 과도한 추상화
 
-### 2.2 가설을 세운 근거
+- 난이도: 중급~고급
+- 선행 지식: Part 2 앞 Chapter
+- 학습 목표: KISS, YAGNI, SOLID, Rule of Three를 현재 규모에 적용함
+- 예상 읽기 시간: 35분
+- 연결 코드: 전체 `namuwiki_trend/`, `AGENTS.md`
 
-이 가설은 다음의 정적 웹 수집 흐름을 전제로 했다.
+---
 
-1. HTTP 요청으로 HTML을 받는다.
-2. HTML에서 검색어 목록을 찾는다.
-3. 목록 요소를 순서대로 파싱한다.
-4. 요소의 순서를 순위로 변환한다.
+# Part 3. Web Crawling and Browser Automation
 
-정적 HTML에 데이터가 포함되어 있다면 이 방식은 빠르고 단순하며 테스트하기 쉽다.
-그러나 이 단계는 가설이었고, 실제 페이지 구조를 확인하기 전에는 사실로 확정하지 않았다.
+웹 페이지의 초기 응답과 최종 DOM을 구분하고 검증된 근거로 수집 방식을 선택하는 Part다.
 
-## 3. 실험 과정
+## Chapter 13. HTTP Request와 Response
 
-조사는 다음 순서로 진행했다.
+- 난이도: 초급~중급
+- 선행 지식: URL, 네트워크 기본
+- 학습 목표: HTTP status, header, payload, GET과 POST의 역할을 구분함
+- 예상 읽기 시간: 35분
+- 연결 코드: `news_context_provider.py`, `collector.py`
 
-    초기 가설
-       ↓
-    View Source 확인
-       ↓
-    Network Fetch/XHR 분석
-       ↓
-    Elements에서 실제 DOM 분석
-       ↓
-    수집 기술 비교 및 선택
+## Chapter 14. HTML, DOM, View Source
 
-### Step 1. View Source 확인
+- 난이도: 초급~중급
+- 선행 지식: HTML 기본 구조
+- 학습 목표: 초기 HTML과 JavaScript 이후 DOM이 달라지는 이유를 이해함
+- 예상 읽기 시간: 35분
+- 연결 코드: `namu.html`, `collector.py`, `PoC Preparation Report.md`
 
-#### 실험
+## Chapter 15. CSR, SSR, Dynamic Rendering
 
-브라우저에서 Ctrl+U를 사용해 페이지의 View Source를 확인했다.
+- 난이도: 중급
+- 선행 지식: HTTP, DOM
+- 학습 목표: 데이터 생성 위치가 수집 도구 선택에 미치는 영향을 분석함
+- 예상 읽기 시간: 30분
+- 연결 코드: `collector.py`, `playwright_poc.py`
 
-#### 결과
+## Chapter 16. DevTools Network와 Evidence 기반 조사
 
-View Source의 초기 HTML에는 실시간 검색어가 존재하지 않았다.
+- 난이도: 중급
+- 선행 지식: HTTP와 브라우저 DevTools
+- 학습 목표: Fetch/XHR, Response, Initiator를 확인하고 API를 추측하지 않음
+- 예상 읽기 시간: 40분
+- 연결 코드: `STUDY_NOTE.md`의 과거 조사 기록, `PoC Preparation Report.md`
 
-#### 해석
+## Chapter 17. CSS Selector, Locator, XPath
 
-초기 HTTP 응답에 목표 데이터가 없다면 단순히 초기 응답을 받아 파싱하는 방식만으로는 목표 데이터를 얻을 수 없다.
+- 난이도: 중급
+- 선행 지식: DOM tree
+- 학습 목표: 실제 구조에 기반한 안정적 Locator를 선택하고 fallback을 남용하지 않음
+- 예상 읽기 시간: 40분
+- 연결 코드: `collector.py`, `extraction.py`, `playwright_poc.py`
 
-#### 다음 실험
+## Chapter 18. requests와 BeautifulSoup
 
-데이터가 다른 네트워크 요청으로 전달되는지 확인하기 위해 DevTools의 Fetch/XHR 요청을 조사했다.
+- 난이도: 초급~중급
+- 선행 지식: HTTP, HTML
+- 학습 목표: 정적 HTML 파싱의 장점과 동적 사이트의 한계를 판단함
+- 예상 읽기 시간: 30분
+- 연결 코드: `news_context_provider.py`, `pyproject.toml`
 
-### Step 2. Network 분석
+## Chapter 19. Playwright와 Chromium
 
-#### 실험
+- 난이도: 중급
+- 선행 지식: DOM, Locator, Python context manager
+- 학습 목표: Headless browser, BrowserContext, 대기와 종료를 안전하게 관리함
+- 예상 읽기 시간: 45분
+- 연결 코드: `collector.py`, `playwright_poc.py`, `namu.html`
 
-DevTools의 Network 탭에서 Fetch/XHR 요청을 확인했다.
+---
 
-#### 결과
+# Part 4. AI Integration
 
-- sidebar.json 요청을 확인했다.
-- 해당 요청은 최근 변경 문서 API임을 확인했다.
+외부 LLM을 애플리케이션의 책임과 분리하고 근거·비용·실패를 통제하는 Part다.
 
-#### 해석
+## Chapter 20. RSS와 News Context
 
-sidebar.json은 프로젝트가 수집하려는 실시간 검색어 순위 데이터의 출처가 아니었다.
-페이지에서 발견한 요청이라고 해서 목표 데이터의 API라고 단정할 수 없다는 점을 확인했다.
+- 난이도: 중급
+- 선행 지식: HTTP, XML, datetime
+- 학습 목표: RSS field, parsing, URL 검증과 뉴스 문맥의 한계를 이해함
+- 예상 읽기 시간: 40분
+- 연결 코드: `news_context_provider.py`, `news_context_poc.py`
 
-#### 다음 실험
+## Chapter 21. LLM Provider와 Prompt Builder
 
-검색어를 클릭했을 때 발생하는 다른 요청의 형식과 의미를 확인했다.
+- 난이도: 중급
+- 선행 지식: Provider interface, 문자열 처리
+- 학습 목표: Prompt 생성과 SDK 호출을 분리하고 교체 가능한 경계를 설계함
+- 예상 읽기 시간: 40분
+- 연결 코드: `gemini_reason_generator.py`, `enricher.py`
 
-### Step 3. application/octet-stream 확인
+## Chapter 22. Prompt Engineering과 Grounding
 
-#### 실험
+- 난이도: 중급
+- 선행 지식: 뉴스 문맥, LLM 기본 개념
+- 학습 목표: 근거 밖 추측을 제한하고 fallback 응답을 정의함
+- 예상 읽기 시간: 40분
+- 연결 코드: `build_reason_prompt()`, `tests/namuwiki_trend/test_gemini_reason_generator.py`
 
-실시간 검색어 항목을 클릭하고 그 시점에 발생하는 /i/xxxxx 요청을 확인했다.
+## Chapter 23. Rate Limit, Quota, Retry
 
-#### 결과
+- 난이도: 중급~고급
+- 선행 지식: 예외 처리, 시간과 함수 주입
+- 학습 목표: 최소 요청 간격, 429 제한 재시도, RetryInfo와 exponential backoff를 설계함
+- 예상 읽기 시간: 45분
+- 연결 코드: `gemini_reason_generator.py`, `main.py`
 
-- 요청 경로는 /i/xxxxx 형태였다.
-- application/octet-stream 형식과 관련된 요청이었다.
-- 이 요청은 검색어 클릭 시 발생했다.
-- 실시간 검색어를 가져오는 API가 아니었다.
+## Chapter 24. Clock Injection과 시간 의존성
 
-#### 해석
+- 난이도: 중급
+- 선행 지식: DI, 함수 객체
+- 학습 목표: 실제 sleep 없이 시간 기반 정책을 테스트함
+- 예상 읽기 시간: 30분
+- 연결 코드: `gemini_reason_generator.py`, 관련 Gemini 테스트
 
-application/octet-stream이라는 형식만으로 데이터의 의미를 판단할 수 없다.
-실제 요청 시점, 응답 내용과 호출 주체를 함께 확인해야 한다.
+---
 
-이번 조사에서는 해당 요청이 실시간 검색어 API가 아니라는 것을 확인했다.
-정확한 내부 바이너리 구조나 별도 API endpoint는 이 조사 결과로 확정하지 않는다.
+# Part 5. Testing and Quality Engineering
 
-#### 다음 실험
+테스트를 기능 확인을 넘어 계약 검증과 데이터 품질 관찰 도구로 사용하는 Part다.
 
-네트워크 API를 추측하는 대신 브라우저 화면에 실제로 렌더링된 DOM을 Elements 탭에서 확인했다.
+## Chapter 25. pytest의 기본 구조
 
-### Step 4. Elements에서 DOM 분석
+- 난이도: 초급
+- 선행 지식: Python 함수
+- 학습 목표: test discovery, assertion, parametrization과 실패 읽기를 익힘
+- 예상 읽기 시간: 35분
+- 연결 코드: `tests/`, `pyproject.toml`
 
-#### 실험
+## Chapter 26. Fake, Mock, Fixture, MonkeyPatch
 
-브라우저의 Elements 탭에서 화면에 표시된 실시간 검색어 목록을 확인했다.
+- 난이도: 중급
+- 선행 지식: DI, 객체 계약
+- 학습 목표: 외부 API 없이 Provider, Gemini, Pipeline을 검증함
+- 예상 읽기 시간: 45분
+- 연결 코드: `tests/namuwiki_trend/test_enricher.py`, `test_main.py`
 
-#### 결과
+## Chapter 27. Unit Verification과 Live Verification
 
-실시간 검색어는 다음 계층으로 렌더링되었다.
+- 난이도: 중급
+- 선행 지식: pytest, 외부 시스템
+- 학습 목표: 재현 가능한 단위 테스트와 quota를 소비하는 Live 검증을 분리함
+- 예상 읽기 시간: 35분
+- 연결 코드: `scripts/verify.py`, `README.md`, `ARCHITECTURE.md`
 
-    <ul>
-      └── <li>
-          └── <a>
-              └── <span>
+## Chapter 28. Quality Diagnostics와 Heuristic
 
-DOM의 순서가 실시간 검색어 순위를 나타내는 것으로 확인했다.
+- 난이도: 중급
+- 선행 지식: dataclass, sequence, 문자열 정규화
+- 학습 목표: 구조적 성공과 의미적 품질을 구분하고 관찰 지표를 설계함
+- 예상 읽기 시간: 40분
+- 연결 코드: `quality_diagnostics.py`, `test_quality_diagnostics.py`
 
-#### 해석
+## Chapter 29. 데이터 계약과 회귀 방지
 
-초기 HTML에 없던 데이터가 브라우저 렌더링 이후 DOM에 나타났다.
-따라서 목표 데이터는 초기 소스가 아니라 브라우저가 JavaScript를 실행하고 화면을 구성한 결과에서 확인해야 한다.
+- 난이도: 중급
+- 선행 지식: JSON, CSV, pytest
+- 학습 목표: rank, order, schema와 불변성을 테스트로 보존함
+- 예상 읽기 시간: 35분
+- 연결 코드: `extraction.py`, `csv_storage.py`, `insight_storage.py`
 
-이번 조사에서는 구체적인 CSS selector 문자열을 확정하지 않았다.
-확인한 사실은 요소의 계층 구조와 DOM 순서가 순위라는 점이다.
+---
 
-## 4. 주변 지식
+# Part 6. DevOps and Operations
 
-다음 설명은 일반적인 웹·HTTP·Python 지식과 이번 프로젝트에서 확인한 사례를 구분하여 작성한다.
+코드가 실제 환경에서 반복 실행되고 실패를 진단할 수 있도록 만드는 Part다.
 
-### 4.1 View Source
+## Chapter 30. Ruff, compileall, verify.py
 
-View Source는 브라우저가 서버에서 받은 초기 HTML 문서를 보여주는 기능이다.
-일반적으로 Ctrl+U 또는 페이지 소스 보기 기능으로 확인한다.
+- 난이도: 초급~중급
+- 선행 지식: shell command, pytest
+- 학습 목표: 정적 검사·테스트·컴파일·diff 검사를 하나의 Harness로 실행함
+- 예상 읽기 시간: 30분
+- 연결 코드: `scripts/verify.py`, `tests/test_verify.py`
 
-requests가 서버에서 받는 내용은 대체로 View Source에서 확인하는 초기 응답과 같은 단계의 데이터이다.
-초기 HTML에 목표 데이터가 없다면 requests만으로 브라우저 화면의 최종 데이터를 얻을 수 없다.
+## Chapter 31. Shell Script와 실행 경계
 
-View Source는 서버가 전달한 초기 HTML, 메타데이터와 정적 요소를 확인할 때 사용한다.
-이번 프로젝트의 Ctrl+U 결과에는 실시간 검색어가 없었다.
+- 난이도: 중급
+- 선행 지식: Bash 기본 명령
+- 학습 목표: root 계산, 환경변수, exit code, stdout/stderr를 운영 경계에 배치함
+- 예상 읽기 시간: 35분
+- 연결 코드: `run_namuwiki_trend.sh`
 
-### 4.2 DOM
+## Chapter 32. Linux, WSL, cron
 
-DOM(Document Object Model)은 HTML 문서를 브라우저가 객체와 트리 구조로 표현한 모델이다.
-문서의 요소, 속성과 텍스트를 프로그램이 다룰 수 있게 한다.
+- 난이도: 중급
+- 선행 지식: shell, 프로세스와 파일 경로
+- 학습 목표: cron 표현식, WSL 지속성, daemon과 사용자 crontab을 이해함
+- 예상 읽기 시간: 40분
+- 연결 코드: `README.md`, `ARCHITECTURE.md`, `run_namuwiki_trend.sh`
 
-브라우저는 초기 HTML을 DOM으로 구성하고 JavaScript 실행 결과에 따라 노드를 추가하거나 변경한다.
-DevTools의 Elements 탭은 브라우저가 현재 구성한 DOM을 보여준다.
+## Chapter 33. Logging, Monitoring, Debugging
 
-이번 프로젝트에서는 Elements에서 실시간 검색어가 ul → li → a → span 구조로 표시되었고,
-DOM 순서가 순위임을 확인했다.
+- 난이도: 중급
+- 선행 지식: exception, shell exit code
+- 학습 목표: 로그에서 실행 상태·실패 원인·소요 시간을 관찰함
+- 예상 읽기 시간: 40분
+- 연결 코드: `config.py`, `run_namuwiki_trend.sh`, `logs/`
 
-### 4.3 View Source와 DOM의 차이
+## Chapter 34. Git, GitHub, Conventional Commit
 
-View Source는 서버의 초기 문서이고, DOM은 브라우저가 초기 문서와 JavaScript 실행 결과를 반영한 현재 구조이다.
-따라서 CSR 페이지에서는 두 결과가 달라질 수 있다.
+- 난이도: 초급~중급
+- 선행 지식: Git 기본 명령
+- 학습 목표: 작은 Commit, Working Tree, branch와 원격 협업 규칙을 적용함
+- 예상 읽기 시간: 35분
+- 연결 코드: Git history, `AGENTS.md`
 
-    서버 응답 HTML
-          ↓
-    브라우저 DOM 생성
-          ↓
-    JavaScript 실행
-          ↓
-    노드 추가·수정
-          ↓
-    최종 DOM과 화면
+## Chapter 35. CI/CD와 Release
 
-이번 프로젝트에서는 View Source에 실시간 검색어가 없었지만 Elements에는 목록이 존재했다.
+- 난이도: 중급~고급
+- 선행 지식: verify Harness, Git
+- 학습 목표: 로컬 검증을 CI와 릴리스 기준으로 확장할 때의 조건을 설계함
+- 예상 읽기 시간: 40분
+- 연결 코드: 현재 `scripts/verify.py`; CI workflow와 Release는 향후 설계 대상
 
-### 4.4 CSR(Client-Side Rendering)
+---
 
-CSR은 서버가 최소한의 HTML과 JavaScript 애플리케이션을 전달하고,
-브라우저가 JavaScript를 실행하여 데이터를 가져오고 화면을 구성하는 방식이다.
+# Part 7. Case Study: namuwiki_trend
 
-    브라우저 → 초기 HTML과 JavaScript 요청
-    브라우저 ← 애플리케이션 틀
-    브라우저 → 데이터 요청
-    브라우저 ← 데이터 응답
-    브라우저 → DOM 구성 및 화면 렌더링
+앞의 개념을 실제 프로젝트의 시간 순서로 다시 학습하는 종합 Part다.
 
-Vue, React, Angular 애플리케이션은 CSR 방식으로 동작할 수 있다.
-다만 특정 프레임워크를 사용한다고 해서 전체 페이지가 항상 CSR인 것은 아니므로 실제 동작을 확인해야 한다.
+## Chapter 36. Sprint 1 — Flat Layout과 프로젝트 뼈대
 
-CSR은 화면 상호작용 구현에 유리하지만 초기 JavaScript 실행이 필요하고,
-단순 HTTP 클라이언트만으로 최종 화면을 재현하기 어려울 수 있다.
+- 난이도: 초급~중급
+- 핵심 질문: 왜 독립 패키지와 flat layout으로 시작했는가
+- 연결 코드: `pyproject.toml`, `namuwiki_trend/config.py`, `models.py`
 
-### 4.5 SSR(Server-Side Rendering)
+## Chapter 37. Sprint 2 — Playwright 선택과 DOM 검증
 
-SSR은 서버가 요청 시점에 HTML을 생성하여 브라우저에 전달하는 방식이다.
-초기 응답에 콘텐츠가 포함될 가능성이 높아 정적 HTML 파싱에 적합할 수 있다.
+- 난이도: 중급
+- 핵심 질문: 왜 requests·BeautifulSoup 대신 브라우저 렌더링을 검증했는가
+- 연결 코드: `collector.py`, `extraction.py`, `playwright_poc.py`
 
-SSR은 초기 콘텐츠 전달에 유리하고 CSR은 클라이언트 중심 상호작용에 유리하다.
-실제 사이트는 두 방식을 함께 사용할 수 있으므로 구현 방식은 조사로 확인해야 한다.
+## Chapter 38. Sprint 3 — RSS와 Gemini Enrichment
 
-### 4.6 Static HTML
+- 난이도: 중급
+- 핵심 질문: Collector가 LLM을 직접 알지 않아야 하는 이유는 무엇인가
+- 연결 코드: `news_context_provider.py`, `gemini_reason_generator.py`, `enricher.py`
 
-Static HTML은 서버가 전달한 HTML만으로 필요한 콘텐츠를 표현하는 문서이다.
-데이터가 초기 응답에 포함되어 있다면 requests와 BeautifulSoup 조합으로 수집할 수 있다.
+## Chapter 39. Sprint 4 — Pipeline과 JSON Output Contract
 
-이번 프로젝트의 초기 HTML에는 실시간 검색어가 없었으므로 목표 데이터에는 정적 HTML 파싱만으로 충분하지 않았다.
+- 난이도: 중급
+- 핵심 질문: 단일 Item을 Top10 Application으로 연결하고 결과를 어떻게 보존했는가
+- 연결 코드: `pipeline.py`, `insight_storage.py`, `main.py`
 
-### 4.7 Dynamic Rendering
+## Chapter 40. Sprint 5 — Rate Limiting과 Retry
 
-Dynamic Rendering은 JavaScript 실행, 추가 데이터 요청 또는 사용자 상호작용에 따라 최종 화면이 구성되는 상황이다.
-동적 렌더링 페이지를 수집하려면 최종 DOM이 생성되는 시점과 데이터를 확인해야 한다.
+- 난이도: 중급~고급
+- 핵심 질문: Free Tier quota 실패를 어느 계층에서 해결했는가
+- 연결 코드: `gemini_reason_generator.py`, Live 실행 기록
 
-이번 프로젝트에서는 Elements에서 실시간 검색어가 나타나는 것을 확인했으므로 브라우저 렌더링 결과를 수집하는 방식을 선택했다.
+## Chapter 41. Sprint 6 — Quality Diagnostics
 
-### 4.8 DevTools
+- 난이도: 중급
+- 핵심 질문: 구조적 성공과 의미적 뉴스 품질을 어떻게 구분해 관찰하는가
+- 연결 코드: `quality_diagnostics.py`, `test_quality_diagnostics.py`
 
-| 탭 | 일반적인 역할 | 이번 조사에서의 사용 |
-|---|---|---|
-| Elements | 현재 DOM과 요소 구조 확인 | 실시간 검색어 요소 계층과 순위 순서 확인 |
-| Console | JavaScript 실행과 오류 확인 | 별도 결과를 기록하지 않음 |
-| Network | 요청, 응답, 헤더와 타이밍 확인 | Fetch/XHR와 클릭 시 요청 조사 |
-| Sources | 로드된 소스와 스크립트 확인 | 별도 결과를 기록하지 않음 |
-| Application | 쿠키, 저장소와 캐시 확인 | 별도 결과를 기록하지 않음 |
+## Chapter 42. Sprint 7 — WSL cron 운영
 
-사용하지 않은 탭의 결과는 확인한 사실처럼 기록하지 않는다.
+- 난이도: 중급
+- 핵심 질문: 개발 명령을 반복 가능한 운영 실행으로 어떻게 감싸는가
+- 연결 코드: `run_namuwiki_trend.sh`, `README.md`, `ARCHITECTURE.md`
 
-### 4.9 Network 탭의 주요 항목
+## Chapter 43. 전체 회고 — 설계·검증·운영의 연결
 
-- Request: 요청 대상과 요청 방식
-- Response: 서버가 반환한 실제 응답
-- Headers: 요청·응답의 메타데이터
-- Payload: 요청과 함께 전달한 데이터
-- Preview: 브라우저가 해석한 응답 미리보기
-- Initiator: 요청을 발생시킨 코드나 동작
-- Timing: 요청 단계별 소요 시간
+- 난이도: 종합
+- 핵심 질문: 각 Sprint의 Evidence가 다음 설계 결정을 어떻게 제한하고 개선했는가
+- 연결 코드: 전체 패키지, Git history, 문서와 로그
 
-이번 조사에서는 Fetch/XHR 목록에서 sidebar.json과 /i/xxxxx 요청을 확인했다.
-그러나 확인한 요청을 실시간 검색어 API로 단정하지 않았다.
+---
 
-### 4.10 application/octet-stream
+# 학습 순서와 집필 로드맵
 
-application/octet-stream은 특정 구조를 보장하지 않는 일반 바이너리 데이터에 사용할 수 있는 MIME 타입이다.
-이 타입만으로 JSON, 이미지, 압축 파일 등 실제 내용의 구조를 알 수 없다.
+## 권장 읽기 순서
 
-JSON 응답은 일반적으로 application/json으로 표현되고 텍스트 기반 객체 구조를 가진다.
-application/octet-stream은 콘텐츠 구조를 MIME 타입만으로 설명하지 않으므로 실제 응답을 별도로 확인해야 한다.
+1. Part 1에서 Python 프로젝트와 데이터 계약을 이해한다.
+2. Part 2에서 책임·의존성·Pipeline 구조를 이해한다.
+3. Part 3에서 실제 웹 데이터의 생성 위치와 수집 방식을 이해한다.
+4. Part 4에서 뉴스 문맥과 Gemini 경계를 이해한다.
+5. Part 5에서 테스트와 품질 측정 방법을 이해한다.
+6. Part 6에서 로컬 검증을 운영 자동화로 연결한다.
+7. Part 7에서 Sprint 순서로 전체 의사결정을 재구성한다.
 
-이번 프로젝트에서는 /i/xxxxx 요청에서 application/octet-stream 형식을 확인했다.
-이 요청은 검색어 클릭 시 발생했으며 실시간 검색어 API가 아니었다.
+## 추후 집필 순서
 
-### 4.11 HTML
+1. Chapter 1~6: Python과 프로젝트 읽기
+2. Chapter 7~12: Architecture와 책임 경계
+3. Chapter 13~19: Web Crawling 조사와 Playwright
+4. Chapter 20~24: RSS, Gemini, Rate Limit
+5. Chapter 25~29: Testing과 Quality Diagnostics
+6. Chapter 30~35: Harness, WSL, cron, Git, CI/CD
+7. Chapter 36~43: Sprint Case Study와 전체 회고
 
-HTML은 웹 문서의 구조와 콘텐츠를 표현하는 마크업 언어이다.
-태그의 중첩 관계로 문서 구조를 표현하며, 브라우저는 이를 DOM으로 변환한다.
-
-HTML에 목표 데이터가 직접 포함되면 정적 파싱이 가능하지만,
-JavaScript 실행 후 추가되는 데이터라면 초기 HTML만으로는 부족할 수 있다.
-
-### 4.12 CSS Selector
-
-CSS Selector는 HTML 또는 DOM에서 특정 요소를 찾기 위한 표현식이다.
-태그, 클래스, id, 속성과 계층을 기준으로 요소를 선택할 수 있다.
-
-selector는 실제 DOM을 확인한 후 작성해야 한다.
-이번 조사에서는 ul → li → a → span 구조는 확인했지만 구체적인 selector 문자열은 검증하지 않았다.
-
-### 4.13 XPath
-
-XPath는 XML 또는 HTML 문서의 트리 구조에서 노드를 찾는 표현식이다.
-복잡한 계층이나 텍스트 조건을 표현할 수 있지만 DOM 구조가 변경되면 깨지기 쉬울 수 있다.
-
-CSS Selector와 XPath 중 어느 것이 적합한지는 실제 DOM과 유지보수 요구사항에 따라 결정해야 한다.
-이번 조사에서는 XPath를 사용하거나 검증하지 않았다.
-
-### 4.14 BeautifulSoup
-
-BeautifulSoup는 Python에서 HTML과 XML을 파싱하는 라이브러리이다.
-
-적합한 경우:
-
-- 초기 HTML에 목표 데이터가 포함된 경우
-- 정적 문서 구조를 파싱하는 경우
-- 브라우저 JavaScript 실행이 필요하지 않은 경우
-
-적합하지 않은 경우:
-
-- 목표 데이터가 JavaScript 실행 후 생성되는 경우
-- 브라우저 상호작용이 필요한 경우
-- 최종 DOM을 브라우저와 동일하게 만들어야 하는 경우
-
-이번 프로젝트에서는 초기 HTML에 실시간 검색어가 없었으므로 단독 사용을 채택하지 않았다.
-
-### 4.15 Playwright
-
-Playwright는 실제 브라우저를 자동화하여 페이지 로드와 JavaScript 실행을 수행할 수 있는 도구이다.
-
-    Playwright
-        ↓
-    브라우저 실행
-        ↓
-    페이지 로드
-        ↓
-    JavaScript 실행 및 추가 요청
-        ↓
-    최종 DOM 생성
-        ↓
-    요소와 텍스트 수집
-
-장점은 JavaScript 렌더링, 동적 사이트와 브라우저와 동일한 결과를 지원한다는 점이다.
-단점은 브라우저 실행 비용, 메모리 사용량 증가와 requests보다 느린 실행 속도이다.
-
-이번 조사에서는 최종 DOM에 실시간 검색어가 존재하는 것을 확인했기 때문에 Playwright를 채택했다.
-이 문서는 기술 선택을 기록한 것이며, 이번 작업에서 Playwright 코드를 작성했다는 의미는 아니다.
-
-### 4.16 requests
-
-requests는 Python에서 HTTP 요청을 보내고 응답을 받기 위한 라이브러리이다.
-서버와 직접 통신하므로 브라우저를 실행하지 않아 빠르고 가볍다.
-
-장점:
-
-- 실행이 빠르고 가벼움
-- 요청과 응답을 코드로 테스트하기 쉬움
-- 정적 HTTP API와 HTML 수집에 적합
-
-한계:
-
-- JavaScript를 실행하지 않음
-- 브라우저가 만든 최종 DOM을 자동으로 제공하지 않음
-- 브라우저 상호작용이 필요한 사이트를 그대로 재현하지 못함
-
-이번 프로젝트에서는 초기 HTML에 실시간 검색어가 없다는 결과 때문에 단독 수집 도구로 채택하지 않았다.
-
-### 4.17 HTTP Request와 Response
-
-HTTP Request는 클라이언트가 서버에 자원이나 처리를 요청하는 메시지이다.
-일반적으로 method, URL, headers와 payload를 포함한다.
-
-HTTP Response는 서버가 요청에 대해 반환하는 메시지이다.
-상태 코드, headers와 body로 구성되며 body 형식은 Content-Type과 실제 내용을 함께 확인해야 한다.
-
-이번 조사에서는 실제 요청을 확인했지만 확인하지 않은 payload, headers와 method를 사실처럼 기록하지 않았다.
-
-### 4.18 GET과 POST
-
-- GET: 일반적으로 자원 조회에 사용하며 조회 조건을 URL query에 표현할 수 있다.
-- POST: 일반적으로 데이터를 전달하거나 처리를 요청할 때 사용하며 payload를 포함할 수 있다.
-
-이는 일반적인 HTTP 의미이며 특정 사이트의 실제 동작은 Network에서 확인해야 한다.
-이번 조사에서는 실시간 검색어 API의 확정된 method를 확인하지 않았다.
-
-### 4.19 Browser Rendering
-
-브라우저 렌더링은 대략 다음 과정을 거친다.
-
-1. HTML과 리소스를 요청한다.
-2. HTML을 DOM으로 구성한다.
-3. CSS를 적용해 렌더 트리를 만든다.
-4. JavaScript를 실행한다.
-5. 필요하면 추가 요청을 수행한다.
-6. 변경된 DOM과 스타일을 화면에 반영한다.
-
-초기 HTML과 최종 DOM이 다를 수 있는 이유는 이 과정에서 JavaScript와 추가 요청이 개입하기 때문이다.
-
-## 5. 기술 비교
-
-| 비교 항목 | AA(RPA) | Python requests | BeautifulSoup | Python Playwright |
-|---|---|---|---|---|
-| 개발 속도 | 매우 빠름 | 빠름 | 빠름 | 상대적으로 느림 |
-| 유지보수 | 화면 변경에 취약할 수 있음 | 요청 구조가 안정적이면 쉬움 | HTML 구조 변경에 영향 | 브라우저 흐름 기반으로 관리 가능 |
-| 확장성 | 복잡한 로직에서 제한될 수 있음 | Python 코드로 높음 | 파서 역할 중심 | 브라우저 자동화 범위가 넓음 |
-| 테스트 | 화면 환경 의존성이 큼 | 단위 테스트가 쉬움 | fixture 파싱 테스트가 쉬움 | 브라우저 실행 테스트가 필요함 |
-| 디버깅 | 화면 단계 확인 | 요청·응답 확인 | 파싱 결과 확인 | 브라우저와 DOM을 함께 확인 |
-| 성능 | 도구와 화면 환경에 좌우됨 | 가장 빠르고 가벼움 | 파싱 비용이 낮음 | requests보다 느림 |
-| 브라우저 의존성 | 높음 | 없음 | 없음 | 있음 |
-| JavaScript 대응 | 브라우저 자동화로 가능 | 불가 | 불가 | 가능 |
-| 학습 난이도 | 화면 도구 중심 | 낮음 | 낮음 | 상대적으로 높음 |
-
-이번 프로젝트의 조사 결과는 다음과 같다.
-
-- AA(RPA): 화면 기반 자동화에는 적합하지만 Python 모노레포의 테스트·재사용·확장 목표와 맞지 않았다.
-- requests: 빠르고 가볍지만 초기 HTML에 실시간 검색어가 없었다.
-- BeautifulSoup: 정적 HTML 파싱에는 적합하지만 JavaScript 렌더링 결과를 만들지 않는다.
-- Playwright: 브라우저 렌더링 결과를 얻을 수 있어 조사한 데이터 형태에 가장 적합했다.
-
-## 6. Trade-off
-
-이번 프로젝트에서는 속도보다 안정성과 유지보수성을 우선했다.
-
-HTTP API를 역공학하면 브라우저보다 빠른 수집을 만들 가능성이 있지만,
-확인되지 않은 endpoint와 응답 형식에 의존하게 되고 변경 시 원인을 추적하기 어려울 수 있다.
-
-브라우저 렌더링 결과를 수집하는 방식은 다음 비용이 있다.
-
-- 브라우저 실행 비용
-- 메모리 사용량 증가
-- requests보다 느린 실행 속도
-- 브라우저와 자동화 도구의 버전 관리
-
-그럼에도 초기 HTML에 실시간 검색어가 없고 Elements의 최종 DOM에 목표 데이터가 존재한다는 사실을 확인했다.
-따라서 Playwright를 선택하는 것이 장기 유지보수에 더 적합하다고 판단했다.
-
-이것은 조사 결과에 근거한 기술적 판단이며, Playwright 구현이 완료되었다는 의미는 아니다.
-
-## 7. Lessons Learned
-
-- View Source와 DOM은 다를 수 있다.
-- 초기 HTML에 데이터가 없으면 requests와 BeautifulSoup만으로는 충분하지 않을 수 있다.
-- Network에서 발견한 요청을 목표 데이터의 출처라고 즉시 단정하면 안 된다.
-- application/octet-stream은 실제 응답 내용을 확인해야 한다.
-- Elements에서 본 DOM 구조와 순위 관계를 기록하면 파서 설계의 근거가 된다.
-- CSS Selector와 XPath는 실제 DOM을 확인한 뒤 작성해야 한다.
-- 동적 사이트의 수집 도구는 성능뿐 아니라 유지보수성과 구현 비용까지 비교해야 한다.
-- 기술 선택 결과와 실제 구현 완료 여부는 별도로 기록해야 한다.
-
-## 8. Interview Notes
-
-### Q1. 왜 Playwright를 사용했습니까?
-
-초기 HTML에는 실시간 검색어가 없었고, Elements에서 JavaScript 렌더링 이후의 DOM에 실시간 검색어가 존재하는 것을 확인했다.
-브라우저와 동일한 렌더링 결과를 얻기 위해 Playwright를 선택했다.
-
-### Q2. View Source와 DOM의 차이는 무엇입니까?
-
-View Source는 서버에서 받은 초기 HTML을 보여준다.
-DOM은 브라우저가 초기 HTML을 바탕으로 구성하고 JavaScript 실행으로 변경한 현재 문서 구조이다.
-따라서 동적 렌더링 페이지에서는 두 결과가 다를 수 있다.
-
-### Q3. CSR과 SSR의 차이는 무엇입니까?
-
-CSR은 브라우저가 JavaScript를 실행하여 데이터를 가져오고 화면을 구성하는 방식이다.
-SSR은 서버가 요청 시점에 HTML을 생성하여 전달하는 방식이다.
-이번 조사에서는 초기 HTML에 실시간 검색어가 없고 최종 DOM에 목록이 나타나는 현상을 확인했지만,
-사이트 전체의 렌더링 아키텍처를 단정하지는 않았다.
-
-### Q4. BeautifulSoup를 사용하지 않은 이유는 무엇입니까?
-
-BeautifulSoup는 HTML 파싱 도구이지 JavaScript 실행 도구가 아니다.
-이번 프로젝트에서는 초기 HTML에 실시간 검색어가 없었기 때문에 최종 DOM을 생성할 수 있는 Playwright가 더 적합했다.
-
-### Q5. RPA 대신 Python을 선택한 이유는 무엇입니까?
-
-RPA는 화면 기반 자동화에 강점이 있지만, 이 프로젝트는 독립 패키지, 데이터 모델, 테스트와 로그를 코드로 관리해야 한다.
-Python은 이러한 구조를 재사용 가능한 모듈과 테스트로 관리하기에 적합하다고 판단했다.
-
-### Q6. Network 분석만으로 API를 찾으면 안 되는 이유는 무엇입니까?
-
-Network에는 페이지의 여러 기능에서 발생하는 요청이 함께 표시된다.
-이번 조사에서도 sidebar.json은 최근 변경 문서 API였고, /i/xxxxx는 검색어 클릭 시 발생하는 요청이었지만 실시간 검색어 API가 아니었다.
-
-# Chapter: Automation Anywhere에서 Python으로 재구현하며 배운 점
-
-이 챕터는 Automation Anywhere와 Python을 단순 비교하는 문서가 아니다.
-실무에서 Automation Anywhere로 먼저 구현했던 RPA를 Python으로 다시 구현하면서,
-두 기술의 개발 방식과 문제 해결 방식의 차이를 분석한 기록이다.
-
-이 문서에서는 실제 프로젝트 경험과 일반적인 기술 설명을 구분한다.
-
-- **프로젝트 경험**: 이 프로젝트에서 실제로 수행하거나 확인한 과정
-- **일반적인 설명**: 각 도구의 일반적인 사용 방식과 특성
-
-## 1. 프로젝트 배경
-
-### 1.1 Automation Anywhere로 먼저 구현한 이유
-
-이 업무 자동화는 처음에 Automation Anywhere를 사용하여 구현했다.
-Automation Anywhere는 브라우저를 열고 화면 요소를 선택하며,
-사용자 행동에 가까운 순서로 자동화 흐름을 구성할 수 있다.
-
-실무에서 빠르게 업무 절차를 자동화해야 했고, 브라우저 화면을 기준으로 동작을 조합하는 방식이 초기 구현에 적합했다.
-따라서 먼저 RPA 도구로 업무 흐름을 검증하고 자동화했다.
-
-### 1.2 Python으로 다시 구현하게 된 이유
-
-Automation Anywhere로 동작하는 업무 흐름을 확인한 뒤,
-동일한 자동화를 Python 프로젝트로 재구현하며 기술적 차이를 분석하고자 했다.
-
-Python 재구현의 목적은 Automation Anywhere를 대체하거나 어느 한쪽의 우월성을 증명하는 것이 아니다.
-다음 항목을 직접 비교하기 위한 것이다.
-
-- 화면 기반 자동화와 코드 기반 자동화의 차이
-- 브라우저 요소를 다루는 방식의 차이
-- 외부 데이터 수집 과정의 디버깅 차이
-- 테스트, Git 협업과 장기 유지보수의 차이
-
-## 2. Automation Anywhere 구현 과정
-
-### 2.1 Browser Package
-
-Automation Anywhere에서는 Browser Package를 사용하여 브라우저를 열고 웹 페이지에 접근하는 흐름을 구성했다.
-브라우저 실행과 페이지 이동을 업무 자동화 흐름의 시작점으로 사용했다.
-
-### 2.2 Object Cloning
-
-Object Cloning은 브라우저 화면에서 자동화 대상이 되는 요소를 선택하고 식별하는 과정이다.
-화면에서 검색어 영역이나 버튼과 같은 대상을 지정하고,
-이후 Action이 해당 객체를 대상으로 동작하도록 연결했다.
-
-이 방식에서는 브라우저 화면에서 조작할 요소를 먼저 식별하는 것이 중요하다.
-
-### 2.3 Action
-
-Action은 자동화 흐름의 개별 동작이다.
-페이지 이동, 클릭, 값 입력, 데이터 추출과 같은 작업을 순서대로 배치하여 업무 절차를 표현한다.
-
-일반적으로 RPA의 개발 흐름은 코드를 처음부터 작성하기보다,
-화면에서 수행할 동작을 작은 단위로 배치하고 실행 결과를 확인하는 방식에 가깝다.
-
-### 2.4 Variable
-
-Variable은 검색어, 순위, 반복 횟수, 추출 결과와 같은 값을 저장하는 데 사용한다.
-화면에서 읽은 값을 다음 Action이나 Excel 저장 단계로 전달하려면 변수 설계가 필요하다.
-
-변수를 사용하면 각 Action 사이에 전달되는 데이터 흐름을 표현할 수 있다.
-
-### 2.5 Loop
-
-Loop는 여러 검색어 또는 여러 행을 반복 처리하기 위해 사용한다.
-검색 결과 목록을 하나씩 처리하거나 추출한 데이터를 순서대로 저장하는 흐름을 Loop로 구성했다.
-
-실시간 검색어 순위처럼 순서가 중요한 데이터에서는 반복 순서와 순위 값을 함께 보존해야 한다.
-
-### 2.6 Error Handler
-
-Error Handler는 브라우저 접근 실패, 요소를 찾지 못한 경우,
-데이터 추출 실패와 같은 예외 상황을 처리하기 위한 구성 요소다.
-
-자동화가 중간에 실패했을 때 오류를 기록하거나 다음 처리로 이동할지 결정하는 역할을 한다.
-자동화 흐름에서는 정상 경로뿐 아니라 실패 경로를 함께 설계해야 한다.
-
-### 2.7 Excel 저장
-
-Automation Anywhere에서 추출한 데이터를 Excel에 저장했다.
-Excel 저장 단계에서는 행과 열의 위치, 헤더, 반복 데이터의 순서를 맞추는 것이 중요하다.
-
-실시간 검색어 데이터의 경우 검색어만 저장하면 순위 정보가 사라질 수 있으므로,
-순위와 수집 시각을 함께 저장해야 한다.
-
-### 2.8 Automation Anywhere 개발 흐름
-
-프로젝트에서 경험한 RPA 개발 흐름은 다음과 같이 정리할 수 있다.
-
-    브라우저 실행
-        ↓
-    페이지 이동
-        ↓
-    Object Cloning으로 대상 요소 식별
-        ↓
-    Action 배치
-        ↓
-    Variable에 값 저장
-        ↓
-    Loop로 반복 처리
-        ↓
-    Error Handler로 실패 흐름 처리
-        ↓
-    Excel 저장
-
-이 흐름은 화면에서 사람이 수행하는 업무 절차를 자동화 단계로 옮기는 방식이었다.
-
-## 3. Python 재구현 과정
-
-### 3.1 requests 시도
-
-Python 재구현에서는 먼저 requests와 BeautifulSoup 조합을 검토했다.
-초기 가설은 HTTP 요청으로 HTML을 받고, HTML 안의 실시간 검색어 목록을 파싱하는 것이었다.
-
-이 방식은 정적 페이지라면 빠르고 가볍다.
-하지만 실제로 View Source를 확인한 결과 초기 HTML에 실시간 검색어가 존재하지 않았다.
-
-### 3.2 View Source 확인
-
-브라우저에서 Ctrl+U를 사용해 View Source를 확인했다.
-초기 HTML에 목표 데이터가 없다는 사실을 확인하면서,
-RPA 화면에서 보이는 데이터와 서버가 처음 전달한 HTML이 다를 수 있음을 알게 되었다.
-
-### 3.3 Network 분석
-
-DevTools의 Fetch/XHR 요청을 조사했다.
-
-- sidebar.json은 최근 변경 문서 API였다.
-- /i/xxxxx 요청은 검색어 클릭 시 발생했다.
-- 해당 요청은 application/octet-stream 형식과 관련되었지만 실시간 검색어 API가 아니었다.
-
-따라서 Network에서 보이는 요청을 무조건 목표 데이터의 API로 사용하지 않고,
-요청이 발생한 시점과 실제 기능을 함께 확인했다.
-
-### 3.4 DOM 분석
-
-Elements에서 브라우저가 렌더링한 실시간 검색어 영역을 확인했다.
-구조는 다음과 같았다.
-
-    ul
-      ↓
-    li
-      ↓
-    a
-      ↓
-    span
-
-DOM의 순서가 실시간 검색어 순위임을 확인했다.
-이 과정에서 View Source가 아니라 브라우저가 JavaScript 실행 후 구성한 DOM을 수집해야 한다는 점을 이해했다.
-
-### 3.5 Playwright 선택
-
-requests와 BeautifulSoup는 초기 HTML과 정적 파싱에 적합하지만,
-이번 프로젝트의 목표 데이터는 초기 HTML에 없었다.
-
-Playwright는 브라우저를 실행하고 JavaScript를 처리한 뒤 최종 DOM을 확인할 수 있다.
-브라우저 실행 비용과 메모리 사용량은 증가하지만,
-이번 프로젝트에서는 속도보다 안정성과 유지보수성을 우선하여 Playwright를 선택했다.
-
-이 챕터에서 기록하는 것은 기술 선택 과정이다.
-Playwright 수집기 구현 완료를 의미하지 않는다.
-
-### 3.6 Python 재구현 흐름
-
-Python으로 재구현할 때의 흐름은 다음과 같이 정리할 수 있다.
-
-    수집 목표 정의
-        ↓
-    초기 HTML 확인
-        ↓
-    Network 요청의 의미 확인
-        ↓
-    최종 DOM 구조 확인
-        ↓
-    브라우저 자동화 도구 선택
-        ↓
-    순위·검색어·수집 시각 모델링
-        ↓
-    테스트와 로그를 포함한 코드 구현
-
-Automation Anywhere가 화면 동작을 Action의 순서로 표현했다면,
-Python은 요청, 렌더링, 파싱, 데이터 모델과 저장을 코드의 책임으로 분리한다.
-
-## 4. 구현 과정 비교
-
-| 비교 항목 | Automation Anywhere | Python 재구현 |
-|---|---|---|
-| 개발 속도 | 화면 동작을 빠르게 조합할 수 있음 | 초기 환경과 구조 설계에 시간이 필요함 |
-| 디버깅 방식 | Action 실행 결과와 화면 상태를 확인함 | 요청, 응답, DOM, 예외와 로그를 단계별로 확인함 |
-| HTML/DOM 이해 | 도구가 요소 선택을 보조함 | HTML과 DOM 구조를 직접 이해해야 함 |
-| 유지보수 | 화면과 Object 변경의 영향을 받음 | 코드, selector, 의존성과 브라우저 버전을 관리함 |
-| 확장성 | 단순 흐름 확장에 적합함 | 모듈, 모델, 테스트와 패키지로 확장하기 쉬움 |
-| 테스트 | 실행 환경과 화면 상태에 의존하기 쉬움 | fixture, mock과 단위 테스트를 구성하기 쉬움 |
-| Git 협업 | 도구 파일과 실행 환경 공유가 중요함 | 텍스트 기반 코드와 문서를 diff로 검토하기 쉬움 |
-
-### 4.1 개발 속도
-
-Automation Anywhere에서는 화면에서 브라우저를 열고 요소를 선택한 뒤 Action을 연결하는 과정이 빠르게 진행되었다.
-업무 흐름을 눈으로 확인하면서 짧은 시간에 동작을 만들 수 있었다.
-
-Python에서는 패키지 구조, 설정, 데이터 모델, 예외 처리와 테스트 방향을 먼저 결정해야 했다.
-초기 구현까지의 준비 비용이 더 컸다.
-
-### 4.2 디버깅 방식
-
-Automation Anywhere에서는 어느 Action에서 화면 동작이 실패했는지와 브라우저 상태를 확인하는 방식이 중심이었다.
-
-Python에서는 다음을 별도로 확인해야 한다.
-
-- HTTP 요청이 성공했는가
-- 응답이 목표 데이터인가
-- JavaScript 실행 후 DOM이 생성되었는가
-- selector가 실제 요소를 찾는가
-- 순위와 검색어가 올바르게 변환되는가
-
-Python은 확인해야 하는 계층이 많지만 각 계층의 원인을 로그와 테스트로 분리할 수 있다.
-
-### 4.3 HTML과 DOM 이해 필요 여부
-
-Automation Anywhere에서는 Object Cloning이 요소 선택을 보조하므로,
-초기 개발자가 HTML 구조를 깊이 알지 않아도 화면 자동화를 시작할 수 있다.
-
-Python으로 재구현할 때는 View Source, DOM, JavaScript 렌더링과 selector를 직접 이해해야 했다.
-이 과정은 초기에는 시간이 걸렸지만 브라우저에서 데이터가 만들어지는 원리를 더 정확히 이해하게 했다.
-
-### 4.4 유지보수
-
-Automation Anywhere는 화면이나 객체 속성이 변경되면 Object Cloning과 Action을 다시 확인해야 한다.
-Python은 selector, 브라우저 자동화 코드, 라이브러리 버전과 실행 환경을 관리해야 한다.
-
-두 방식 모두 외부 웹 페이지 변경의 영향을 받는다.
-차이는 변경을 화면 설정으로 관리하는지, 코드와 테스트로 관리하는지에 있다.
-
-### 4.5 확장성
-
-Automation Anywhere는 기존 업무 흐름에 작은 단계를 추가하는 데 편리하다.
-Python은 수집기, 파서, 모델, 저장소와 테스트를 모듈로 나누어 여러 자동화 프로젝트에 확장할 수 있다.
-
-다만 Python의 확장성은 처음부터 구조를 잘 설계하고 불필요한 추상화를 피할 때 의미가 있다.
-
-### 4.6 테스트
-
-Automation Anywhere의 자동화는 브라우저, 화면 상태와 실행 환경에 의존하기 쉽다.
-따라서 전체 흐름을 직접 실행하여 확인하는 비중이 커질 수 있다.
-
-Python에서는 HTML fixture, mock 응답과 데이터 모델을 이용해 브라우저 없이 일부 로직을 검증할 수 있다.
-브라우저 렌더링 자체를 검증하는 테스트는 별도의 실행 비용과 환경 관리가 필요하다.
-
-### 4.7 Git 협업
-
-Python 코드는 텍스트 파일이므로 Git diff로 변경 내용을 확인하고 리뷰하기 쉽다.
-테스트와 문서를 함께 커밋하여 변경 의도와 검증 결과를 남길 수 있다.
-
-Automation Anywhere는 프로젝트 파일과 실행 환경, 패키지 버전의 공유가 중요하다.
-화면 기반 설정의 변경은 코드 diff만으로 동작 변화를 모두 설명하기 어려울 수 있다.
-
-## 5. 개발하면서 느낀 점
-
-### 5.1 Automation Anywhere에서 빠르게 구현할 수 있었던 부분
-
-- 브라우저 실행과 페이지 이동
-- 화면에서 자동화 대상 요소 선택
-- 클릭과 데이터 추출 Action 연결
-- 반복 작업을 Loop로 구성
-- 결과를 Excel로 저장하는 흐름 구성
-
-화면에서 수행하는 업무 절차를 그대로 단계화할 수 있었기 때문에,
-초기 업무 자동화의 검증 속도는 빨랐다.
-
-### 5.2 Python에서 시간이 오래 걸렸던 이유
-
-Python에서는 단순히 화면을 조작하는 것에서 끝나지 않고,
-데이터가 언제 어디서 만들어지는지부터 분석해야 했다.
-
-- 초기 HTML과 최종 DOM의 차이 확인
-- Network 요청의 실제 의미 구분
-- application/octet-stream 요청이 목표 API가 아님을 확인
-- DOM 계층과 순위 관계 확인
-- requests, BeautifulSoup와 Playwright의 적합성 비교
-- 순위 정보를 보존하는 데이터 모델 설계
-
-즉, 구현 코드보다 먼저 웹 페이지의 동작 원리를 확인하는 시간이 필요했다.
-
-### 5.3 Python 재구현으로 새롭게 이해한 웹 기술
-
-RPA에서는 최종 화면을 기준으로 자동화했지만,
-Python 재구현에서는 다음 계층을 구분하게 되었다.
-
-    서버의 초기 HTML
-        ↓
-    HTTP 요청과 응답
-        ↓
-    JavaScript 실행
-        ↓
-    브라우저 DOM
-        ↓
-    화면에 표시되는 결과
-
-이 과정을 통해 View Source와 DOM이 다를 수 있고,
-Network 요청만으로 데이터의 출처를 확정할 수 없으며,
-동적 사이트에서는 브라우저 렌더링이 수집 전략의 핵심이 될 수 있다는 점을 배웠다.
-
-## 6. Trade-off
-
-### 6.1 Automation Anywhere가 적합한 상황
-
-다음과 같은 경우에는 Automation Anywhere가 적합할 수 있다.
-
-- 정해진 화면 업무를 빠르게 자동화해야 하는 경우
-- 비개발자도 유지보수해야 하는 경우
-- 이미 조직에 RPA 운영 환경과 라이선스가 있는 경우
-- Excel, 브라우저와 사내 업무 시스템을 사용자 흐름처럼 연결해야 하는 경우
-
-### 6.2 Python이 적합한 상황
-
-다음과 같은 경우에는 Python이 적합할 수 있다.
-
-- 데이터 수집과 변환 로직을 세밀하게 제어해야 하는 경우
-- 단위 테스트와 fixture 테스트가 필요한 경우
-- Git 기반 코드 리뷰와 협업이 중요한 경우
-- 독립 패키지와 모듈로 기능을 확장해야 하는 경우
-- 로그, 예외 처리와 실행 환경을 코드로 일관되게 관리해야 하는 경우
-
-### 6.3 두 기술로 같은 문제를 해결하며 얻은 인사이트
-
-Automation Anywhere는 업무 절차를 빠르게 자동화하는 데 강점이 있고,
-Python은 자동화 내부의 데이터 흐름과 기술적 원인을 세밀하게 제어하는 데 강점이 있다.
-
-같은 문제를 두 기술로 해결하면서 도구의 우열보다 다음 질문이 중요하다는 것을 배웠다.
-
-- 목표가 화면 업무의 빠른 자동화인가
-- 장기적인 코드 관리와 확장인가
-- 유지보수 담당자가 개발자인가
-- 테스트와 버전 관리가 얼마나 중요한가
-- 브라우저 렌더링을 어느 수준까지 직접 제어해야 하는가
-
-이번 프로젝트에서 Python을 선택한 것은 Automation Anywhere가 부족해서가 아니다.
-실무 RPA를 코드 기반 프로젝트로 재구현하고, 웹 데이터 수집 과정과 유지보수 방식을 분석하려는 프로젝트 목적에 Python이 더 적합했기 때문이다.
-
-두 기술은 해결하려는 문제와 운영 환경에 따라 선택이 달라지는 도구이다.
-따라서 요청의 발생 시점과 응답 의미를 함께 확인해야 한다.
+각 Chapter 집필 시 실제 코드·테스트·명령 결과를 먼저 확인하고, 일반 지식과 프로젝트
+Evidence를 구분한다. 구현되지 않은 기능은 사례처럼 서술하지 않으며, 확인하지 못한 내용은
+`확인하지 못함`으로 표시한다.
