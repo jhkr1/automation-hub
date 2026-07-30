@@ -133,3 +133,11 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - `DailyTrendNewsService`가 Daily Trend 결과와 keyword별 NewsArticle 목록을 결합함
 - Query Service와 News Provider를 생성자 주입하고, 순서 보존·fail-fast 정책을 적용함
 - Fake 기반 단위 테스트로 빈 결과, limit 전달, 예외 전파를 검증함
+
+### Trend Reason Generator
+- `DailyTrendNews` 기반 Prompt Builder와 구조화된 `TrendReason` 모델을 추가함
+- 뉴스 메타데이터만 Prompt에 포함하고, JSON 응답 필드와 confidence를 검증함
+- 뉴스가 없을 때는 Gemini 호출 없이 근거 부족 결과를 반환함
+- Fake client 단위 테스트로 정상 응답, malformed 응답, 필드 누락과 예외 전파를 검증함
+- 단일 Live 호출은 Free Tier 일일 quota 20회 초과로 `429 RESOURCE_EXHAUSTED`가 발생해
+  성공하지 못함. API key와 quota 값은 로그에 기록하지 않음

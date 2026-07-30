@@ -45,6 +45,16 @@ class TrendInsight:
     articles: tuple[NewsArticle, ...]
 
 
+@dataclass(frozen=True)
+class TrendReason:
+    """Daily Trend와 뉴스 문맥으로 생성한 구조화된 설명."""
+
+    keyword: str
+    reason: str
+    confidence: str
+    supporting_articles: tuple[str, ...]
+
+
 @dataclass
 class TrendReport:
     """최종 결과물. 키워드 + 뉴스 + LLM 요약을 합친 보고서 1건."""

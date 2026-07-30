@@ -843,6 +843,30 @@ Service가 두 흐름을 결합하며 DailyTrendRank와 기사 순서를 유지�
 LLM 호출은 담당하지 않고 하위 예외를 숨기지 않습니다. 현재는 CLI·저장·LLM 연결 없이 단위
 테스트로 검증된 Application Layer입니다.
 
+### 16. Trend Reason Generator
+
+`TrendReasonGenerator`는 `DailyTrendNews` 한 건을 입력받아 `TrendReason`을 반환합니다.
+
+```text
+DailyTrendNews
+    ↓ prompt builder
+Gemini client
+    ↓ JSON response validation
+TrendReason
+```
+
+Prompt Builder는 집계 정보와 기사 제목·출처·게시 시각·URL만 전달하며 기사 전문을
+가져오지 않습니다. 출력은 `keyword`, `reason`, `confidence`, `supporting_articles`를
+검증한 immutable read model입니다. 뉴스가 없으면 Gemini를 호출하지 않고 근거 부족·low
+confidence 결과를 반환합니다. SDK client는 생성자 주입하여 단위 테스트에서 외부 호출을
+차단합니다. malformed JSON, 필수 필드 누락, 허용되지 않은 confidence와 빈 reason은
+성공으로 처리하지 않습니다.
+
+현재는 단일 항목 Generator만 구현되었고 Top N orchestration, CLI, 저장, retry는 범위 밖입니다.
+Unit Test는 완료했지만, 2026-07-30 단일 Live 호출은 Gemini Free Tier 일일 요청 quota
+초과(`429 RESOURCE_EXHAUSTED`, quota value 20)로 성공하지 못했습니다. 따라서 현재
+Generator는 Live Verified로 표시하지 않습니다.
+
 ## 15. WSL 운영 구조
 
 namuwiki_trend의 WSL 운영 실행 경계는 저장소 루트의
