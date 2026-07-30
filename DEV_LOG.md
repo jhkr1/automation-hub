@@ -141,3 +141,8 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - Fake client 단위 테스트로 정상 응답, malformed 응답, 필드 누락과 예외 전파를 검증함
 - 단일 Live 호출은 Free Tier 일일 quota 20회 초과로 `429 RESOURCE_EXHAUSTED`가 발생해
   성공하지 못함. API key와 quota 값은 로그에 기록하지 않음
+
+### Daily Trend Reason Application Service
+- `DailyTrendReasonService`가 `DailyTrendNews` 목록을 입력 순서대로 처리함
+- 항목별 Generator 1회 호출, fail-fast 예외 전파, 빈 입력 정책을 적용함
+- Fake Generator로 순서, 중복 keyword, fallback 결과 보존과 예외 전파를 검증함

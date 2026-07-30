@@ -867,6 +867,22 @@ Unit Test는 완료했지만, 2026-07-30 단일 Live 호출은 Gemini Free Tier 
 초과(`429 RESOURCE_EXHAUSTED`, quota value 20)로 성공하지 못했습니다. 따라서 현재
 Generator는 Live Verified로 표시하지 않습니다.
 
+### 17. Daily Trend Reason Application Service
+
+```text
+list[DailyTrendNews]
+    ↓
+DailyTrendReasonService
+    ↓ 항목별 1회, 입력 순서 유지
+TrendReasonGenerator
+    ↓
+list[TrendReason]
+```
+
+`DailyTrendReasonService`는 순회와 orchestration만 담당합니다. Prompt 생성, Gemini 호출,
+응답 검증은 `TrendReasonGenerator`의 책임입니다. Generator 예외는 그대로 전파하며,
+부분 결과·재시도·중복 제거·병렬 처리는 수행하지 않습니다. 빈 입력은 빈 목록을 반환합니다.
+
 ## 15. WSL 운영 구조
 
 namuwiki_trend의 WSL 운영 실행 경계는 저장소 루트의

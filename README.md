@@ -19,6 +19,7 @@ Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프�
 - `TrendPipeline` 기반 Top10 목록 enrichment orchestration
 - `DailyTrendNewsService` 기반 Daily Trend와 뉴스 문맥 결합
 - `TrendReasonGenerator` 기반 단일 Daily Trend 뉴스 근거 설명 생성
+- `DailyTrendReasonService` 기반 다건 reason 생성 orchestration
 - `TrendInsight` JSON 저장
 - `TrendInsight` 품질 진단 지표 계산
 - 외부 명령을 통합 실행하는 verification Harness
@@ -254,6 +255,9 @@ Asia/Seoul 기준이므로 KST 날짜를 직접 전달합니다.
 `TrendReasonGenerator`는 `DailyTrendNews` 한 건의 집계 정보와 뉴스 메타데이터를 Gemini에
 전달해 구조화된 `TrendReason`를 반환합니다. 뉴스가 없으면 API를 호출하지 않고 근거 부족
 결과를 반환합니다. 아직 Top N orchestration, CLI, 저장에는 연결하지 않습니다.
+
+`DailyTrendReasonService`는 `DailyTrendNews` 목록을 입력받아 각 항목의 `TrendReasonGenerator`
+를 순서대로 호출합니다. 결과는 CLI나 Report 저장에 아직 연결하지 않습니다.
 
 저장된 snapshot이 있는 날짜의 Daily Trend를 터미널에서 조회할 수 있습니다. `--date`를
 생략하면 Asia/Seoul 기준 오늘 날짜를 사용하고, `--limit`으로 표시할 결과 수를 지정합니다.
