@@ -153,3 +153,33 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - Gemini 구현과 DailyTrendReasonService는 변경하지 않음
 - OpenAI SDK가 현재 가상환경에 없어 Unit Test는 Fake client로 검증함
 - OpenAI API key 미확인 상태이므로 Live 검증은 수행하지 않음
+
+---
+
+## 2026-07-30 — Google Finance Sprint 1
+
+### 구현
+
+- exchange-qualified symbol을 검증하는 Playwright Collector를 추가함
+- rendered DOM에서 현재가, 전일 종가, 시가, 변동률, 통화를 읽고 `StockPrice`로 정규화함
+- Collector와 extraction 사이에 `StockPricePipeline`을 두고 생성자 주입을 적용함
+- `python -m google_finance.main AAPL:NASDAQ` 단일 종목 CLI를 추가함
+- Fake Playwright graph와 순수 extraction fixture 기반 테스트를 추가함
+- `StockPrice.currency`와 UTC-aware `collected_at` 계약을 보강함
+- 가격과 변동률을 `Decimal`로 유지해 float 변환에 따른 정밀도 손실을 제거함
+- 현재 영어 parsing contract와 일치하지 않는 locale은 명시적으로 거부함
+- locator wait에도 Collector timeout을 전달하고 CLI 오류는 stderr로 출력함
+
+### 검증
+
+- Google Finance 실제 페이지 CLI 실행 성공: `AAPL:NASDAQ`
+- `python scripts/verify.py`: 190 passed, 3 skipped
+- Google Finance 전용 테스트: 27 passed
+- Ruff와 compileall 통과
+
+### 범위와 미검증 사항
+
+- 다중 종목, DB·Excel Storage, Scheduler, LLM 분석은 구현하지 않음
+- 내부 batchexecute/RPC 호출은 사용하지 않음
+- 테스트하지 않은 시장의 DOM 차이와 selector 장기 안정성은 확인하지 못함
+- Google Finance 데이터의 지연·정확성·사용 제한은 운영 도입 전에 별도 검토해야 함

@@ -8,7 +8,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,11 +20,14 @@ class Settings(BaseSettings):
     애플리케이션 시작 시점에 ValidationError로 즉시 실패한다.
     """
 
-    gemini_api_key: str
     stock_symbols: str = "AAPL,GOOGL,MSFT"
+    google_finance_locale: str = "en-US"
     log_level: str = "INFO"
 
-    model_config = {"env_file": PROJECT_ROOT / ".env"}
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_ROOT / ".env",
+        extra="ignore",
+    )
 
     def get_symbol_list(self) -> list[str]:
         """쉼표로 구분된 종목 코드 문자열을 리스트로 변환한다."""

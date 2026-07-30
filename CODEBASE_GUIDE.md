@@ -5,11 +5,11 @@
 왜 존재하고 어떤 흐름에서 협력하는지를 설명한다.
 
 문서의 기준은 현재 코드다. 계획 중인 기능, 과거 PoC, 실제 운영 경로를 구분하며, 현재
-`google_finance`는 설정과 모델만 있고 실행 Application은 없다.
+`google_finance`는 단일 종목 수집·정규화·CLI 실행 경로를 제공한다.
 
 이 문서는 `automation-hub` 전체 저장소를 개괄하지만, 상세 실행 흐름과 코드 Walkthrough는
-현재 완성된 `namuwiki_trend`를 중심으로 한다. `google_finance`는 현재 설정과 데이터 모델만
-존재하므로 실행 흐름과 Application 구조는 아직 없다. 공통 설계는
+현재 완성된 `namuwiki_trend`를 중심으로 한다. `google_finance`의 단일 종목 실행 흐름은
+패키지 문서에 기록한다. 공통 설계는
 [`docs/architecture.md`](docs/architecture.md), 패키지별 문서는
 [`docs/packages/`](docs/packages/)에서 관리한다.
 
@@ -114,8 +114,12 @@ automation-hub/
 │   ├── playwright_poc.py         # Playwright 수동 검증 경로
 │   └── news_context_poc.py       # 뉴스 Provider 수동 검증 경로
 ├── google_finance/
-│   ├── config.py                 # Google Finance용 설정·로거 뼈대
-│   └── models.py                 # StockPrice, StockReport 모델 뼈대
+│   ├── collector.py              # Playwright rendered quote 수집
+│   ├── extraction.py              # 가격·통화·퍼센트 정규화
+│   ├── models.py                 # StockPrice, StockReport 계약
+│   ├── pipeline.py               # 단일 종목 변환 흐름
+│   ├── main.py                   # CLI Composition Root
+│   └── config.py                 # Settings와 로거
 ├── tests/
 │   ├── namuwiki_trend/           # 각 계층의 네트워크 비의존 계약 테스트
 │   └── test_verify.py            # Harness 자체 테스트
@@ -138,8 +142,9 @@ automation-hub/
 └── AGENTS.md                     # AI 협업 규칙
 ```
 
-`google_finance`는 현재 `main.py`, Collector, Provider, Storage가 없어 실행 흐름이 없다.
-향후 개발 시 `namuwiki_trend`의 구조를 그대로 복사하기보다 실제 요구사항을 먼저 확인한다.
+`google_finance`는 현재 단일 종목 Collector, extraction, Pipeline과 CLI 실행 흐름을 제공한다.
+다중 종목·Storage·Scheduler는 아직 구현하지 않았으며, 향후 개발 시 `namuwiki_trend`의 구조를
+그대로 복사하기보다 실제 요구사항을 먼저 확인한다.
 
 ## 4. 실행 흐름 상세 분석
 
@@ -543,9 +548,11 @@ temporary_path.replace(output_path)
 
 ### Google Finance 시작
 
-1. 현재 `google_finance/config.py`, `models.py`의 뼈대와 실제 요구사항을 검토한다.
-2. `namuwiki_trend` 코드를 무조건 복사하지 말고 데이터 source와 output contract를 먼저 정한다.
-3. 공통화는 실제 세 프로젝트에서 반복되는 시점까지 `shared/`를 만들지 않는다.
+1. 현재 `google_finance`의 `collector.py`, `extraction.py`, `pipeline.py`, `main.py`와
+   패키지 문서를 함께 검토한다.
+2. Collector는 symbol-scoped rendered DOM만 읽고, 내부 Google RPC를 사용하지 않는다.
+3. 다중 종목·Storage를 추가하기 전에 output contract와 운영 요구사항을 먼저 정한다.
+4. 공통화는 실제 세 프로젝트에서 반복되는 시점까지 `shared/`를 만들지 않는다.
 
 ## 15. 개선 포인트
 
