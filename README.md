@@ -244,8 +244,17 @@ Asia/Seoul 기준이므로 KST 날짜를 직접 전달합니다.
 - `rank_score`: `SUM(11 - rank_position)`; 1위 10점부터 10위 1점
 
 정렬은 `rank_score` 내림차순, `appearance_count` 내림차순, `best_rank` 오름차순,
-`average_rank` 오름차순, `keyword` 오름차순 순서입니다. 결과는 기본 10개로 제한하며,
-현재 집계 결과를 별도 테이블에 저장하거나 CLI로 실행하는 기능은 추가하지 않았습니다.
+`average_rank` 오름차순, `keyword` 오름차순 순서입니다. 결과는 기본 10개로 제한합니다.
+
+저장된 snapshot이 있는 날짜의 Daily Trend를 터미널에서 조회할 수 있습니다. `--date`를
+생략하면 Asia/Seoul 기준 오늘 날짜를 사용하고, `--limit`으로 표시할 결과 수를 지정합니다.
+
+```bash
+python -m namuwiki_trend.daily_trend_main --date 2026-07-30 --limit 10
+```
+
+결과가 없으면 성공 종료와 함께 `No daily trends found ...` 메시지를 표시합니다. 먼저
+`snapshot_main`으로 해당 날짜의 snapshot을 저장해야 집계 결과가 생성됩니다.
 
 MySQL이 실행 중이고 `DATABASE_URL`이 설정된 환경에서만 통합 테스트를 실행합니다. 기본
 테스트는 외부 MySQL을 요구하지 않습니다.
@@ -288,6 +297,7 @@ python -m namuwiki_trend.news_context_poc
 python -m namuwiki_trend.playwright_poc
 python -m namuwiki_trend.main
 python -m namuwiki_trend.snapshot_main
+python -m namuwiki_trend.daily_trend_main --date 2026-07-30
 ```
 
 앞의 두 명령은 개별 기술 검증용이며, `namuwiki_trend.main`은 Collector부터 JSON 저장까지
@@ -303,7 +313,6 @@ Free Tier quota는 프로젝트와 모델 조건에 따라 달라질 수 있습�
 
 - `google_finance.main`
 - Cache
-- Daily Trend 전용 CLI와 집계 결과 저장
 - Batch 병렬화
 
 따라서 위 기능을 실행하는 명령이나 운영 절차는 제공하지 않습니다.

@@ -822,7 +822,10 @@ UTC는 DB 저장 표준이고, KST(`Asia/Seoul`)는 사용자 표시와 일일 �
 정렬은 rank score, 등장 횟수, best rank, average rank, keyword 순서이며, 마지막 keyword
 정렬로 동률 결과도 deterministic하게 유지합니다. `target_date`는 이미 저장된
 Asia/Seoul 기준 `collection_date`이므로 MySQL timezone 변환 함수에 의존하지 않습니다.
-현재 결과를 별도 테이블에 저장하거나 Scheduler·CLI로 실행하지 않습니다.
+현재 결과는 별도 테이블에 저장하지 않습니다. `namuwiki_trend.daily_trend_main`은 이 read
+model을 터미널 표로 표시하는 얇은 Application/Presentation 경계이며, 집계 SQL이나 저장
+책임을 갖지 않습니다. 날짜는 Asia/Seoul 기준으로 결정하고 Query Service의 반환 순서를
+그대로 출력합니다.
 
 ## 15. WSL 운영 구조
 

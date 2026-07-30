@@ -123,3 +123,8 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 
 ### 다음 작업
 - 현재 집계 결과를 사용한 뉴스 문맥 수집 연계를 검토함
+
+### Daily Trend CLI
+- `daily_trend_main`에서 KST 날짜와 limit을 받아 `DailyTrendQueryService` 결과를 표시함
+- 명시 날짜, KST 기본 날짜, 빈 결과, 입력 오류와 서비스 예외 전파를 테스트함
+- 실제 DB CLI 실행 결과는 별도 Live 검증 후 기록함
