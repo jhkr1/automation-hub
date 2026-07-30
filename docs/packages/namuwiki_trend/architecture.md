@@ -488,7 +488,7 @@ TrendInsight
 - **Implemented**: `TrendEnricher.enrich(trend) -> TrendInsight`
 - **Implemented**: 뉴스 호출 limit 전달, 빈 기사 전달, reason trim·타입·빈 값·최대 300자 검증
 - **Implemented**: `JsonTrendInsightStorage`가 `TrendInsight` 목록을 JSON으로 저장함
-- **Not implemented**: Scheduler, cache, 전용 Daily Trend CLI 및 집계 결과 저장
+- **Not implemented**: Scheduler, cache 및 집계 결과 저장
 
 Known Limitation:
 

@@ -9,7 +9,9 @@
 
 이 문서는 `automation-hub` 전체 저장소를 개괄하지만, 상세 실행 흐름과 코드 Walkthrough는
 현재 완성된 `namuwiki_trend`를 중심으로 한다. `google_finance`는 현재 설정과 데이터 모델만
-존재하므로 실행 흐름과 Application 구조는 아직 없다.
+존재하므로 실행 흐름과 Application 구조는 아직 없다. 공통 설계는
+[`docs/architecture.md`](docs/architecture.md), 패키지별 문서는
+[`docs/packages/`](docs/packages/)에서 관리한다.
 
 ## 1. 프로젝트 한눈에 보기
 
@@ -123,9 +125,16 @@ automation-hub/
 ├── logs/                         # Wrapper·운영 로그, Git ignore
 ├── namu.html                     # 과거 DOM fixture/조사 자산
 ├── pyproject.toml                # 의존성, 패키지 탐색, Ruff·pytest 설정
-├── README.md                     # 사용자·운영 안내
-├── ARCHITECTURE.md               # 설계 결정과 trade-off
-├── STUDY_NOTE.md                 # Handbook 목차
+├── docs/                         # 공통·패키지·학습·PoC 문서
+│   ├── architecture.md
+│   ├── packages/
+│   ├── decisions/
+│   ├── development/
+│   ├── learning/
+│   ├── operations/
+│   └── poc/
+├── README.md                     # GitHub 첫 화면용 안내
+├── CODEBASE_GUIDE.md             # 전체 코드 탐색 가이드
 └── AGENTS.md                     # AI 협업 규칙
 ```
 

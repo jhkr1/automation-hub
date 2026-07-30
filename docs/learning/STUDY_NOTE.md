@@ -136,7 +136,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 선행 지식: dataclass, 파일 I/O
 - 학습 목표: 원본 CSV와 Enriched JSON의 소비 목적을 분리하고 schema를 관리함
 - 예상 읽기 시간: 40분
-- 연결 코드: `csv_storage.py`, `insight_storage.py`, `ARCHITECTURE.md`
+- 연결 코드: `csv_storage.py`, `insight_storage.py`, `../architecture.md`
 
 ## Chapter 12. Clean Architecture와 과도한 추상화
 
@@ -158,7 +158,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: SQL 기본, Part 1
 - 학습 목표: 장기 누적 데이터에서 파일 저장과 관계형 DB의 차이를 이해함
 - 예상 읽기 시간: 35분
-- 연결 코드: `docker-compose.yml`, `database/`, `README.md`
+- 연결 코드: `docker-compose.yml`, `database/`, `../../README.md`
 
 ### Chapter 12.2. SQLAlchemy ORM과 Entity Mapping
 
@@ -190,7 +190,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: datetime, timezone
 - 학습 목표: 저장 표준과 사용자 표시·집계 timezone을 분리함
 - 예상 읽기 시간: 35분
-- 연결 코드: `database/models.py`, `namuwiki_trend/snapshot_main.py`, `ARCHITECTURE.md`
+- 연결 코드: `database/models.py`, `namuwiki_trend/snapshot_main.py`, `../architecture.md`
 
 ### Chapter 12.6. Append-only Snapshot
 
@@ -214,7 +214,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: UTF-8, SQL client
 - 학습 목표: 저장 데이터와 CLI 표시 인코딩 문제를 구분하고 utf8mb4 접속을 검증함
 - 예상 읽기 시간: 25분
-- 연결 코드: `README.md`, `docker-compose.yml`, `tests/database/`
+- 연결 코드: `../../README.md`, `docker-compose.yml`, `tests/database/`
 
 # Part 3. Web Crawling and Browser Automation
 
@@ -234,7 +234,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: HTML 기본 구조
 - 학습 목표: 초기 HTML과 JavaScript 이후 DOM이 달라지는 이유를 이해함
 - 예상 읽기 시간: 35분
-- 연결 코드: `namu.html`, `collector.py`, `PoC Preparation Report.md`
+- 연결 코드: `namu.html`, `collector.py`, `../poc/playwright-preparation.md`
 
 ## Chapter 15. CSR, SSR, Dynamic Rendering
 
@@ -250,7 +250,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: HTTP와 브라우저 DevTools
 - 학습 목표: Fetch/XHR, Response, Initiator를 확인하고 API를 추측하지 않음
 - 예상 읽기 시간: 40분
-- 연결 코드: `STUDY_NOTE.md`의 과거 조사 기록, `PoC Preparation Report.md`
+- 연결 코드: `STUDY_NOTE.md`의 과거 조사 기록, `../poc/playwright-preparation.md`
 
 ## Chapter 17. CSS Selector, Locator, XPath
 
@@ -350,7 +350,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: pytest, 외부 시스템
 - 학습 목표: 재현 가능한 단위 테스트와 quota를 소비하는 Live 검증을 분리함
 - 예상 읽기 시간: 35분
-- 연결 코드: `scripts/verify.py`, `README.md`, `ARCHITECTURE.md`
+- 연결 코드: `scripts/verify.py`, `../../README.md`, `../architecture.md`
 
 ## Chapter 28. Quality Diagnostics와 Heuristic
 
@@ -396,7 +396,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 선행 지식: shell, 프로세스와 파일 경로
 - 학습 목표: cron 표현식, WSL 지속성, daemon과 사용자 crontab을 이해함
 - 예상 읽기 시간: 40분
-- 연결 코드: `README.md`, `ARCHITECTURE.md`, `run_namuwiki_trend.sh`
+- 연결 코드: `../../README.md`, `../architecture.md`, `run_namuwiki_trend.sh`
 
 ## Chapter 33. Logging, Monitoring, Debugging
 
@@ -468,7 +468,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 
 - 난이도: 중급
 - 핵심 질문: 개발 명령을 반복 가능한 운영 실행으로 어떻게 감싸는가
-- 연결 코드: `run_namuwiki_trend.sh`, `README.md`, `ARCHITECTURE.md`
+- 연결 코드: `run_namuwiki_trend.sh`, `../../README.md`, `../architecture.md`
 
 ## Chapter 43. Sprint 3 — MySQL Snapshot Persistence
 
