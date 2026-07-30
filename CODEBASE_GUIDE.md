@@ -7,6 +7,10 @@
 문서의 기준은 현재 코드다. 계획 중인 기능, 과거 PoC, 실제 운영 경로를 구분하며, 현재
 `google_finance`는 설정과 모델만 있고 실행 Application은 없다.
 
+이 문서는 `automation-hub` 전체 저장소를 개괄하지만, 상세 실행 흐름과 코드 Walkthrough는
+현재 완성된 `namuwiki_trend`를 중심으로 한다. `google_finance`는 현재 설정과 데이터 모델만
+존재하므로 실행 흐름과 Application 구조는 아직 없다.
+
 ## 1. 프로젝트 한눈에 보기
 
 ### 목적
@@ -27,7 +31,7 @@
 
 ```mermaid
 flowchart TD
-    Cron[cron: 0 */3 * * *]
+    Cron[cron: 현재 */30 * * * *]
     Wrapper[run_namuwiki_trend.sh]
     Main[namuwiki_trend.main]
     Collector[collector.collect_trends]
@@ -79,8 +83,9 @@ python -m namuwiki_trend.main
 11. Gemini Generator는 Prompt를 만들고 rate limiting·bounded retry를 적용해 SDK를 호출한다.
 12. Enricher는 원본 TrendItem, reason, 기사 tuple을 `TrendInsight`로 만든다.
 13. Pipeline은 `list[TrendInsight]`를 반환한다.
-14. `JsonTrendInsightStorage.save()`가 결과를 `output/trend_insights.json`에 원자적으로
-    저장한다.
+14. `JsonTrendInsightStorage.save()`가 결과를 `output/trend_insights.json`에 저장한다. 같은
+    디렉터리에서 임시 파일을 완성한 뒤 `replace()`하여 불완전한 JSON이 최종 경로에 노출될
+    가능성을 줄인다.
 15. 성공하면 `main()`은 저장 경로를 출력하고 0을 반환한다. 예외가 발생하면 오류를 출력하고
     1을 반환한다.
 
@@ -100,8 +105,8 @@ automation-hub/
 │   ├── enricher.py               # 단일 TrendItem의 뉴스·reason 결합
 │   ├── pipeline.py               # 목록 순회 Batch Orchestrator
 │   ├── insight_storage.py        # TrendInsight JSON 저장
-│   ├── csv_storage.py            # 원본 TrendItem CSV 저장
-│   ├── quality_diagnostics.py    # 결과 품질 heuristic 계산
+│   ├── csv_storage.py            # 기본 Flow 밖의 원본 TrendItem CSV 저장
+│   ├── quality_diagnostics.py    # 기본 Flow 밖의 결과 품질 heuristic 계산
 │   ├── main.py                   # 운영 의존성 조립과 전체 실행
 │   ├── config.py                 # Settings와 로거 정의
 │   ├── playwright_poc.py         # Playwright 수동 검증 경로
@@ -234,6 +239,20 @@ replace한다.
 
 절대로 하지 않는 일: Collector·Pipeline·Enricher를 생성하거나 실행하는 일.
 
+### 4.9 기본 Flow 밖의 모듈
+
+- `csv_storage.py`: `TrendItem` 원본을 CSV로 저장하는 독립 Storage 함수다. 현재
+  `main.py`의 기본 경로는 JSON Storage만 호출하므로 기본 실행에는 포함되지 않는다.
+- `quality_diagnostics.py`: 이미 생성된 `TrendInsight` 목록을 별도로 분석하는 진단 모듈이다.
+  Pipeline이나 Storage에 자동 연결되어 있지 않으며, title keyword match는 heuristic이다.
+- `playwright_poc.py`: 운영 Collector가 아니라 Playwright 환경과 수집 결과를 수동 확인하는
+  PoC 실행 경로다.
+- `news_context_poc.py`: 운영 Enricher가 아니라 News Provider의 외부 RSS 동작을 수동 확인하는
+  PoC 실행 경로다.
+- `config.py`: Settings와 logger factory를 정의하지만, 현재 기본 `main.py` 실행에서
+  Settings나 `get_logger()`가 직접 생성되지는 않는다.
+- `tests/`: 운영 실행의 일부가 아니라 각 계층의 계약과 실패 정책을 보호하는 테스트 전용 코드다.
+
 ## 5. 핵심 클래스 분석
 
 ### `TrendPipeline`
@@ -350,7 +369,7 @@ flowchart TD
 `.env`를 source하고 export하는 것이 현재 실행 경로의 환경변수 전달 방식이다.
 
 `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`은 현재 `NewsContextProvider` 실행에 사용되지 않는다.
-`NewsContextProvider`는 Google News RSS를 사용한다. 설정 파일에 정의되어 있다는 사실과 현재
+`NewsContextProvider`는 Google News RSS에서 검색어 관련 문맥을 가져온다. 설정 파일에 정의되어 있다는 사실과 현재
 호출된다는 사실을 혼동하면 안 된다.
 
 ## 9. 예외 처리 흐름
@@ -398,7 +417,7 @@ sequenceDiagram
     participant O as output/
     participant L as logs/
 
-    C->>W: 0 */3 * * *
+    C->>W: 현재 */30 * * * *
     W->>W: root 계산, cd, .env 전달, flock
     W->>P: python -m namuwiki_trend.main
     P->>O: trend_insights.json overwrite
@@ -406,13 +425,29 @@ sequenceDiagram
     W->>L: start/end/elapsed/exit code
 ```
 
-`flock -n`이 이미 실행 중인 작업을 발견하면 exit 75로 건너뛴다. WSL이 종료되거나 sleep
-상태이면 Linux cron이 실행되지 않을 수 있다. cron은 Python Application의 내부 정책을
-알지 않으며, Wrapper는 실행 경계와 운영 관찰만 담당한다.
+`flock -n`이 이미 실행 중인 작업을 발견하면 exit 75로 건너뛴다. 현재 로컬 crontab에는
+검증을 위해 다음 임시 설정이 적용되어 있다.
+
+```cron
+*/30 * * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh
+```
+
+이는 매시 00분과 30분에 실행한다. 검증 완료 후 기본 운영 주기는 다음 설정으로 복원할
+예정이다.
+
+```cron
+0 */3 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh
+```
+
+cron 설정은 저장소 파일이 아니라 현재 로컬 사용자 crontab의 상태다. WSL이 종료되거나
+sleep 상태이면 Linux cron이 실행되지 않을 수 있다. cron은 Python Application의 내부
+정책을 알지 않으며, Wrapper는 실행 경계와 운영 관찰만 담당한다.
 
 ## 12. 설계 철학
 
 - Flat Layout: 현재 프로젝트가 독립적이고 모듈 수가 작아 import 경로와 구조 복잡도를 낮춤
+- Clean Architecture: 엄격한 전체 구현이 아니라 책임 분리, Composition Root, Dependency
+  Inversion 개념을 현재 규모에 맞게 부분적으로 적용함
 - Pipeline: 목록 순회와 단일 항목 enrichment를 분리해 순서·fail-fast 계약을 명확히 함
 - dataclass: 모델 필드를 명시하고 `TrendItem`, `TrendInsight`의 불변 계약을 표현함
 - Collector/Enricher 분리: 브라우저 수집이 뉴스·LLM과 결합되지 않도록 함
@@ -536,3 +571,124 @@ temporary_path.replace(output_path)
 - 시세 데이터의 시간대·시장 휴장·중복 저장 계약
 - JSON/CSV가 아닌 장기 저장소가 필요한지 여부
 - 두 프로젝트에서 실제로 반복되는 코드가 세 곳에 도달했는지 여부
+
+## 16. 테스트 전략
+
+단위 테스트는 실제 Playwright, Google News, Gemini 서비스가 항상 정상 동작함을 증명하지
+않는다. 각 계층의 입력·출력 계약, 호출 순서, 검증 규칙, 실패 처리 정책을 검증한다.
+
+### Collector
+
+`test_collector.py`는 Playwright 객체를 `MagicMock`으로 대체한다. root 개수, anchor·href
+누락, extraction 오류 전파와 browser/context 정리 계약을 확인하며 실제 Chromium과 사이트를
+호출하지 않는다.
+
+### Extraction
+
+`test_extraction.py`는 `validate_and_rank_items()`라는 순수 함수에 raw tuple fixture를
+전달한다. sentinel 제거, 10개 검증, keyword·href 검증과 rank 부여를 네트워크 없이 확인한다.
+
+### News Provider
+
+`test_news_context_provider.py`는 Fake HTTP client와 RSS XML fixture를 사용한다. XML parsing,
+URL deduplication, limit, trim, malformed XML과 HTTP 예외 전달을 검증하며 Google News를
+호출하지 않는다.
+
+### Gemini Generator
+
+`test_gemini_reason_generator.py`는 Fake client/model을 사용한다. Prompt 계약, 응답 검증,
+SDK 오류 전달, clock·sleeper 주입, 요청 간격과 429 bounded retry를 실제 sleep 없이 확인한다.
+
+### Enricher와 Pipeline
+
+`test_enricher.py`는 Fake News Provider와 Fake Reason Generator를 주입한다. 호출 순서,
+article limit, reason validation과 예외 전달을 보호한다. `test_pipeline.py`는 Fake Collector와
+Fake Enricher로 순서 보존, 빈 결과, fail-fast와 입력 불변성을 확인한다.
+
+### Storage
+
+`test_csv_storage.py`와 `test_insight_storage.py`는 `tmp_path`와 실제 모델을 사용한다. CSV·JSON
+필드 계약, encoding, 순서, overwrite, 부모 디렉터리, 입력 불변성과 JSON parsing을 검증한다.
+
+### Main과 Quality Diagnostics
+
+`test_main.py`는 Fake Pipeline과 Fake Storage로 Composition Root의 주입과 성공·실패 종료 코드를
+확인한다. `test_quality_diagnostics.py`는 외부 호출 없이 빈 결과, fallback, title match heuristic,
+중복 URL, rank 이상과 빈 필드를 검증한다.
+
+### Harness
+
+`tests/test_verify.py`는 `scripts/verify.py`가 Ruff, pytest, compileall, `git diff --check`를
+순서대로 실행하고 첫 실패에서 중단하는지 검증한다. 실제 표준 실행은 다음 명령이다.
+
+```bash
+python scripts/verify.py
+```
+
+## 17. 추천 코드 읽기 순서
+
+### 1단계: 실행 경계와 Application Flow
+
+```text
+main.py
+pipeline.py
+enricher.py
+```
+
+왜 먼저 읽는가: 사용자의 명령이 어떤 객체를 조립하고 어떤 순서로 데이터를 이동시키는지
+먼저 알아야 내부 Provider의 역할을 오해하지 않는다.
+
+확인할 질문:
+
+- 누가 `TrendPipeline.run()`을 호출하는가?
+- 이 계층은 어떤 의존성을 생성하고 어떤 의존성을 주입받는가?
+- 이 객체가 절대로 하지 않는 일은 무엇인가?
+
+### 2단계: 입력과 출력 경계
+
+```text
+collector.py
+extraction.py
+insight_storage.py
+```
+
+왜 읽는가: 입력 데이터가 어떻게 검증된 `TrendItem`이 되고, 최종 `TrendInsight`가 어떻게
+외부 JSON으로 나가는지 이해한다.
+
+확인할 질문:
+
+- DOM의 sentinel과 Top10 경계는 어디서 검증되는가?
+- rank와 입력 순서는 어느 계층에서 보존되는가?
+- 저장 실패가 수집·enrichment 책임으로 역전되지 않는가?
+
+### 3단계: 외부 시스템
+
+```text
+news_context_provider.py
+gemini_reason_generator.py
+```
+
+왜 읽는가: Application이 외부 시스템을 직접 다루지 않고 Provider 계약을 통해 사용하는
+이유와 외부 실패 정책을 확인한다.
+
+확인할 질문:
+
+- 실제 네트워크·SDK를 테스트에서 어떻게 대체하는가?
+- 어떤 예외만 retry하며 retry하지 않는 예외는 무엇인가?
+- 뉴스 문맥이 의미적 관련성을 보장하지 않는다는 한계는 어디에 반영되는가?
+
+### 4단계: 데이터 계약과 검증
+
+```text
+models.py
+tests/namuwiki_trend/
+scripts/verify.py
+```
+
+왜 읽는가: 앞서 본 호출 흐름이 어떤 모델 계약과 자동 검증으로 보호되는지 확인한다.
+
+확인할 질문:
+
+- `TrendItem`, `NewsArticle`, `TrendInsight`의 경계는 무엇인가?
+- 각 테스트는 구현 세부사항이 아니라 어떤 공개 계약을 보호하는가?
+- 로컬 검증을 통과해도 어떤 외부 Live 사실은 여전히 확인되지 않는가?
