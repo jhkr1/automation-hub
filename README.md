@@ -17,6 +17,7 @@ Python 기반 업무 자동화 프로젝트 모음입니다. 각 자동화 프�
 - Gemini 호출 최소 간격 제한과 429 `RESOURCE_EXHAUSTED` bounded retry
 - 단일 `TrendItem` enrichment와 `TrendInsight` 생성
 - `TrendPipeline` 기반 Top10 목록 enrichment orchestration
+- `DailyTrendNewsService` 기반 Daily Trend와 뉴스 문맥 결합
 - `TrendInsight` JSON 저장
 - `TrendInsight` 품질 진단 지표 계산
 - 외부 명령을 통합 실행하는 verification Harness
@@ -245,6 +246,9 @@ Asia/Seoul 기준이므로 KST 날짜를 직접 전달합니다.
 
 정렬은 `rank_score` 내림차순, `appearance_count` 내림차순, `best_rank` 오름차순,
 `average_rank` 오름차순, `keyword` 오름차순 순서입니다. 결과는 기본 10개로 제한합니다.
+
+`DailyTrendNewsService`는 Daily Trend 결과와 keyword별 Google News RSS 문맥을 결합합니다.
+현재는 Application Layer 단위 서비스로만 제공되며, CLI·저장·LLM 분석에는 연결하지 않습니다.
 
 저장된 snapshot이 있는 날짜의 Daily Trend를 터미널에서 조회할 수 있습니다. `--date`를
 생략하면 Asia/Seoul 기준 오늘 날짜를 사용하고, `--limit`으로 표시할 결과 수를 지정합니다.

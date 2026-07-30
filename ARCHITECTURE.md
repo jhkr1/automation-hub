@@ -827,6 +827,22 @@ model을 터미널 표로 표시하는 얇은 Application/Presentation 경계이
 책임을 갖지 않습니다. 날짜는 Asia/Seoul 기준으로 결정하고 Query Service의 반환 순서를
 그대로 출력합니다.
 
+`DailyTrendNewsService`는 Query Service와 News Context Provider를 조정하는 Application
+Service입니다.
+
+```text
+DailyTrendQueryService
+    ↓ list[DailyTrendRank]
+DailyTrendNewsService
+    ↓ keyword별 NewsContextProvider.search()
+list[DailyTrendNews]
+```
+
+Query Service는 뉴스 Provider를 모르고, 뉴스 Provider는 Daily Trend를 모릅니다. Application
+Service가 두 흐름을 결합하며 DailyTrendRank와 기사 순서를 유지합니다. SQL, RSS 파싱, 저장,
+LLM 호출은 담당하지 않고 하위 예외를 숨기지 않습니다. 현재는 CLI·저장·LLM 연결 없이 단위
+테스트로 검증된 Application Layer입니다.
+
 ## 15. WSL 운영 구조
 
 namuwiki_trend의 WSL 운영 실행 경계는 저장소 루트의

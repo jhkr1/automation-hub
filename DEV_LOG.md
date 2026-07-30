@@ -128,3 +128,8 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - `daily_trend_main`에서 KST 날짜와 limit을 받아 `DailyTrendQueryService` 결과를 표시함
 - 명시 날짜, KST 기본 날짜, 빈 결과, 입력 오류와 서비스 예외 전파를 테스트함
 - 실제 DB CLI 실행 결과는 별도 Live 검증 후 기록함
+
+### Daily Trend News Application Service
+- `DailyTrendNewsService`가 Daily Trend 결과와 keyword별 NewsArticle 목록을 결합함
+- Query Service와 News Provider를 생성자 주입하고, 순서 보존·fail-fast 정책을 적용함
+- Fake 기반 단위 테스트로 빈 결과, limit 전달, 예외 전파를 검증함
