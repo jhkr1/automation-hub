@@ -148,6 +148,74 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 
 ---
 
+## Persistence and Data Modeling Track
+
+Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문제로 확장하는 보충 영역이다.
+
+### Chapter 12.1. 관계형 데이터베이스와 MySQL
+
+- 난이도: 초급~중급
+- 선행 지식: SQL 기본, Part 1
+- 학습 목표: 장기 누적 데이터에서 파일 저장과 관계형 DB의 차이를 이해함
+- 예상 읽기 시간: 35분
+- 연결 코드: `docker-compose.yml`, `database/`, `README.md`
+
+### Chapter 12.2. SQLAlchemy ORM과 Entity Mapping
+
+- 난이도: 중급
+- 선행 지식: class, type hint, SQL 기본
+- 학습 목표: Python 객체와 테이블·컬럼·제약조건을 매핑함
+- 예상 읽기 시간: 45분
+- 연결 코드: `database/base.py`, `database/models.py`
+
+### Chapter 12.3. Session, Transaction, Commit과 Rollback
+
+- 난이도: 중급
+- 선행 지식: ORM mapping, SQL transaction
+- 학습 목표: Top10 일부만 저장되는 부분 상태를 transaction으로 방지함
+- 예상 읽기 시간: 40분
+- 연결 코드: `database/session.py`, `database/snapshot_save_service.py`, `tests/database/`
+
+### Chapter 12.4. Alembic Migration
+
+- 난이도: 중급
+- 선행 지식: SQLAlchemy metadata, schema 변경
+- 학습 목표: ORM schema와 실제 DB schema를 version control함
+- 예상 읽기 시간: 35분
+- 연결 코드: `alembic.ini`, `alembic/env.py`, `alembic/versions/`
+
+### Chapter 12.5. UTC 저장과 KST 업무 날짜
+
+- 난이도: 중급
+- 선행 지식: datetime, timezone
+- 학습 목표: 저장 표준과 사용자 표시·집계 timezone을 분리함
+- 예상 읽기 시간: 35분
+- 연결 코드: `database/models.py`, `namuwiki_trend/snapshot_main.py`, `ARCHITECTURE.md`
+
+### Chapter 12.6. Append-only Snapshot
+
+- 난이도: 중급
+- 선행 지식: transaction, data modeling
+- 학습 목표: 변경 가능한 현재 상태와 수집 이력 보존 모델의 차이를 이해함
+- 예상 읽기 시간: 30분
+- 연결 코드: `database/models.py`, `database/snapshot_save_service.py`
+
+### Chapter 12.7. Query, Aggregation, Read Model
+
+- 난이도: 중급
+- 선행 지식: SQL GROUP BY, aggregate function
+- 학습 목표: 저장 Entity와 조회 전용 결과 타입을 분리하고 deterministic ranking을 설계함
+- 예상 읽기 시간: 45분
+- 연결 코드: `database/daily_trend_query.py`, `tests/database/test_daily_trend_query.py`
+
+### Chapter 12.8. MySQL 문자셋과 Client Encoding
+
+- 난이도: 중급
+- 선행 지식: UTF-8, SQL client
+- 학습 목표: 저장 데이터와 CLI 표시 인코딩 문제를 구분하고 utf8mb4 접속을 검증함
+- 예상 읽기 시간: 25분
+- 연결 코드: `README.md`, `docker-compose.yml`, `tests/database/`
+
 # Part 3. Web Crawling and Browser Automation
 
 웹 페이지의 초기 응답과 최종 DOM을 구분하고 검증된 근거로 수집 방식을 선택하는 Part다.
@@ -402,7 +470,20 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 핵심 질문: 개발 명령을 반복 가능한 운영 실행으로 어떻게 감싸는가
 - 연결 코드: `run_namuwiki_trend.sh`, `README.md`, `ARCHITECTURE.md`
 
-## Chapter 43. 전체 회고 — 설계·검증·운영의 연결
+## Chapter 43. Sprint 3 — MySQL Snapshot Persistence
+
+- 상태: 구현 완료
+- 핵심 질문: 왜 원본 순위 데이터를 append-only DB snapshot으로 보존했는가
+- 연결 코드: `database/models.py`, `alembic/`, `database/snapshot_save_service.py`,
+  `namuwiki_trend/snapshot_main.py`
+
+## Chapter 44. Sprint 4 — Daily Trend Query
+
+- 상태: 조회 서비스 구현 완료, 집계 결과 저장과 전용 CLI는 미구현
+- 핵심 질문: KST 업무 날짜의 반복 출현과 순위를 어떻게 SQL로 요약하는가
+- 연결 코드: `database/daily_trend_query.py`, `tests/database/test_daily_trend_query.py`
+
+## Chapter 45. 전체 회고 — 설계·검증·운영의 연결
 
 - 난이도: 종합
 - 핵심 질문: 각 Sprint의 Evidence가 다음 설계 결정을 어떻게 제한하고 개선했는가
@@ -416,11 +497,12 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 
 1. Part 1에서 Python 프로젝트와 데이터 계약을 이해한다.
 2. Part 2에서 책임·의존성·Pipeline 구조를 이해한다.
-3. Part 3에서 실제 웹 데이터의 생성 위치와 수집 방식을 이해한다.
-4. Part 4에서 뉴스 문맥과 Gemini 경계를 이해한다.
-5. Part 5에서 테스트와 품질 측정 방법을 이해한다.
-6. Part 6에서 로컬 검증을 운영 자동화로 연결한다.
-7. Part 7에서 Sprint 순서로 전체 의사결정을 재구성한다.
+3. Persistence and Data Modeling Track에서 원본 보존과 집계를 이해한다.
+4. Part 3에서 실제 웹 데이터의 생성 위치와 수집 방식을 이해한다.
+5. Part 4에서 뉴스 문맥과 Gemini 경계를 이해한다.
+6. Part 5에서 테스트와 품질 측정 방법을 이해한다.
+7. Part 6에서 로컬 검증을 운영 자동화로 연결한다.
+8. Part 7에서 Sprint 순서로 전체 의사결정을 재구성한다.
 
 ## 추후 집필 순서
 
@@ -430,7 +512,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 4. Chapter 20~24: RSS, Gemini, Rate Limit
 5. Chapter 25~29: Testing과 Quality Diagnostics
 6. Chapter 30~35: Harness, WSL, cron, Git, CI/CD
-7. Chapter 36~43: Sprint Case Study와 전체 회고
+7. Chapter 36~45: Sprint Case Study와 전체 회고
 
 각 Chapter 집필 시 실제 코드·테스트·명령 결과를 먼저 확인하고, 일반 지식과 프로젝트
 Evidence를 구분한다. 구현되지 않은 기능은 사례처럼 서술하지 않으며, 확인하지 못한 내용은

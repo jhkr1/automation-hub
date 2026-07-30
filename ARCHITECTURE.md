@@ -140,8 +140,10 @@ Selenium Grid 및 기존 기업 자산을 활용할 수 있습니다. Selenium M
 - **Implemented**: CSV 테스트를 포함한 전체 테스트 27개 통과
 - **Implemented**: `utf-8-sig`, `newline=""`, 부모 디렉터리 자동 생성, 기존 파일 덮어쓰기 정책 적용
 - **Planned**: 수집 시각을 포함한 저장 스키마 검토
-- **Rejected for now**: XLSX 저장, Database 저장, Scheduler, CLI,
-  Logging framework, retry, fallback locator
+- **Historical initial decision**: 초기 Sprint에서는 XLSX 저장, Database 저장, Scheduler, CLI,
+  Logging framework, retry, fallback locator를 현재 요구사항 밖으로 두었음
+- **Current implementation**: 이후 `TrendSnapshot` DB 저장, snapshot CLI, Daily Trend 조회가
+  추가됨. 집계 결과 저장과 전용 집계 CLI는 아직 구현하지 않음
 
 선택 이유는 일반적인 선호가 아니라 다음 현재 조건 때문입니다.
 
@@ -177,7 +179,8 @@ Playwright는 DOM에서 원시 항목을 읽고, sentinel·개수·rank 검증�
 - **Implemented**: UTF-8 BOM을 포함한 `utf-8-sig`로 한국어와 Windows Excel 소비를 고려함
 - **Implemented**: 부모 디렉터리를 자동 생성하고 같은 경로의 기존 파일을 덮어씀
 - **Rejected for now**: append와 atomic write는 누적 저장·무결성 요구가 명시되지 않아 구현하지 않음
-- **Rejected for now**: XLSX와 Database는 현재 요구사항에 필요한 조건이 확인되지 않음
+- **Historical initial decision**: 초기에는 XLSX와 Database가 현재 요구사항에 필요한지
+  확인되지 않아 보류했음. 현재는 시간대별 원본 누적과 조회 요구로 `TrendSnapshot` DB를 구현함
 
 ### 5.9 저장 형식 재검토 조건
 
@@ -485,7 +488,7 @@ TrendInsight
 - **Implemented**: `TrendEnricher.enrich(trend) -> TrendInsight`
 - **Implemented**: 뉴스 호출 limit 전달, 빈 기사 전달, reason trim·타입·빈 값·최대 300자 검증
 - **Implemented**: `JsonTrendInsightStorage`가 `TrendInsight` 목록을 JSON으로 저장함
-- **Not implemented**: Scheduler, retry, cache, CLI
+- **Not implemented**: Scheduler, cache, 전용 Daily Trend CLI 및 집계 결과 저장
 
 Known Limitation:
 
@@ -737,7 +740,91 @@ keyword-title match는 trim 후 `casefold()`한 문자열 포함 여부만 확�
 따라서 `InsightQualityReport`는 품질 문제를 관찰하기 위한 진단 자료이며, 뉴스 검색
 알고리즘이나 Gemini Prompt의 품질을 자동으로 보증하는 평가 결과가 아닙니다.
 
-## 12. WSL 운영 구조
+## 12. Database Layer: TrendSnapshot
+
+SQLAlchemy 2.x와 Alembic은 원본 실시간 검색어 스냅샷을 저장하기 위한 기반으로 추가되어
+있습니다. 현재 DB 레이어는 `database/base.py`의 `Base`, `database/engine.py`의 Engine,
+`database/session.py`의 `SessionLocal`, `database/models.py`의 `TrendSnapshot`으로
+분리되어 있습니다. Collector와 저장 서비스는 아직 연결하지 않았습니다.
+
+`TrendSnapshot`은 한 수집 시점의 순위 항목을 보존합니다.
+
+- `collected_at`, `created_at`: 애플리케이션에서 timezone-aware 입력만 받고 UTC로 변환한
+  뒤 timezone 정보를 제거한 naive UTC 값으로 ORM 객체와 MySQL `DATETIME`에 저장합니다.
+  이 naive 값은 local time이 아니라 UTC임을 전제로 하며, MySQL `DATETIME` 자체의 timezone
+  자동 변환에는 의존하지 않습니다.
+- `collection_date`: `collected_at`을 `Asia/Seoul`로 변환해 애플리케이션에서 계산합니다.
+- `rank_position`: 1~10 범위는 애플리케이션 검증과 DB `CHECK` 제약조건으로 이중 보호합니다.
+- `keyword`: 앞뒤 공백만 제거하고 내부 공백과 원래 대소문자는 유지합니다. lowercase나
+  Unicode normalization은 적용하지 않습니다. 빈 문자열은 애플리케이션과 DB에서 검증하며,
+  동일성 비교는 현재 MySQL collation 정책을 따릅니다. 길이는 `VARCHAR(255)`로 제한합니다.
+- `created_at`: 저장 시점의 UTC를 애플리케이션 기본값으로 사용합니다. DB 서버 timezone에
+  의존하지 않고 입력 정책을 한 곳에서 유지하기 위한 선택입니다.
+
+일일 집계의 날짜 필터와 keyword 그룹화를 고려해
+`(collection_date, keyword)` 복합 인덱스를 사용합니다. `collection_date` 단독 인덱스는
+복합 인덱스의 선행 컬럼과 중복되므로 추가하지 않았습니다. `(collected_at,
+rank_position)` unique 제약조건은 한 수집 시각의 동일 순위 중복을 방지합니다.
+
+`TrendSnapshot`은 원본 수집 이력을 보존하는 append-only 모델입니다. 생성 후
+`collected_at`, `collection_date`, `rank_position`, `keyword`를 변경하는 update API를
+제공하지 않습니다. 현재 ORM 객체를 완전한 immutable 객체로 강제하지는 않으며, 저장 계층은
+기존 snapshot을 수정하지 않고 새 snapshot을 추가하는 방식으로 설계합니다.
+
+Alembic `0002_create_trend_snapshots`가 이 테이블을 생성하며, `0001_initial_empty`는
+수정하지 않았습니다.
+
+## 13. Collector-to-Snapshot Application Flow
+
+원본 스냅샷 저장 흐름은 `snapshot_main.py`에서 의존성을 조립하고
+`SnapshotCollectionPipeline`이 실행을 조정합니다.
+
+```text
+collect_trends()
+    ↓ list[TrendItem]
+SnapshotCollectionPipeline
+    ↓
+SnapshotSaveService
+    ↓ one transaction
+trend_snapshots
+```
+
+- Collector: 나무위키에서 `TrendItem` 목록만 수집합니다.
+- `SnapshotCollectionPipeline`: Collector를 호출하고 결과를 저장 서비스에 전달합니다.
+- `SnapshotSaveService`: 동일한 `collected_at`을 생성하고 `TrendSnapshot`으로 변환한 뒤
+  하나의 transaction으로 저장합니다.
+- MySQL: 원본 snapshot을 영속화하며, 일부 항목만 저장되는 상태를 rollback으로 방지합니다.
+
+Collector는 DB를 알지 않고, 저장 서비스는 Collector를 호출하지 않도록 분리했습니다.
+따라서 실제 네트워크 수집과 DB 저장을 각각 fake로 교체해 Application Pipeline을 테스트할
+수 있습니다. 빈 수집 결과는 정상 결과로 보고 저장 서비스를 호출하지 않습니다.
+
+`snapshot_main.py`는 이 흐름의 Composition Root이자 CLI entry point입니다. Pipeline 실행
+결과의 row 개수만 stdout에 표시해 사용자가 수집·저장 성공 여부를 확인할 수 있게 하며,
+transaction과 DB 저장 책임은 `SnapshotSaveService`에 유지합니다. 실제 저장 여부와
+`collected_at` 일관성은 MySQL CLI 조회로 검증합니다.
+
+UTC는 DB 저장 표준이고, KST(`Asia/Seoul`)는 사용자 표시와 일일 집계 기준입니다. 저장
+형식과 표시 형식을 분리하면 DB의 UTC 일관성을 유지하면서 운영자가 CLI에서 직관적인
+한국 시각을 확인할 수 있습니다.
+
+## 14. Daily Trend Query
+
+`DailyTrendQueryService`는 `collection_date`를 기준으로 `TrendSnapshot`을 SQL에서
+`GROUP BY keyword` 집계합니다. 결과는 영속화하지 않고 immutable read model인
+`DailyTrendRank` 목록으로 반환합니다.
+
+- `appearance_count`: keyword 등장 횟수
+- `best_rank`: `MIN(rank_position)`
+- `average_rank`: 평균 rank
+- `rank_score`: `SUM(11 - rank_position)`
+
+정렬은 rank score, 등장 횟수, best rank, average rank, keyword 순서이며, 마지막 keyword
+정렬로 동률 결과도 deterministic하게 유지합니다. `target_date`는 이미 저장된
+Asia/Seoul 기준 `collection_date`이므로 MySQL timezone 변환 함수에 의존하지 않습니다.
+현재 결과를 별도 테이블에 저장하거나 Scheduler·CLI로 실행하지 않습니다.
+
+## 15. WSL 운영 구조
 
 namuwiki_trend의 WSL 운영 실행 경계는 저장소 루트의
 `run_namuwiki_trend.sh` Wrapper입니다.
