@@ -146,3 +146,10 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - `DailyTrendReasonService`가 `DailyTrendNews` 목록을 입력 순서대로 처리함
 - 항목별 Generator 1회 호출, fail-fast 예외 전파, 빈 입력 정책을 적용함
 - Fake Generator로 순서, 중복 keyword, fallback 결과 보존과 예외 전파를 검증함
+
+### OpenAI Trend Reason Generator
+- OpenAI Responses API 기반 Generator와 동일한 `TrendReason` 결과 contract를 추가함
+- JSON Schema 응답 형식과 supporting URL subset 검증을 적용함
+- Gemini 구현과 DailyTrendReasonService는 변경하지 않음
+- OpenAI SDK가 현재 가상환경에 없어 Unit Test는 Fake client로 검증함
+- OpenAI API key 미확인 상태이므로 Live 검증은 수행하지 않음

@@ -867,6 +867,26 @@ Unit Test는 완료했지만, 2026-07-30 단일 Live 호출은 Gemini Free Tier 
 초과(`429 RESOURCE_EXHAUSTED`, quota value 20)로 성공하지 못했습니다. 따라서 현재
 Generator는 Live Verified로 표시하지 않습니다.
 
+### 16.1 OpenAI Trend Reason Generator
+
+Reason Generator contract는 Provider 교체 지점으로 사용합니다.
+
+```text
+DailyTrendNews
+        ↓
+Reason Generator Contract
+       ↙          ↘
+Gemini              OpenAI Responses API
+       ↘          ↙
+          TrendReason
+```
+
+`OpenAITrendReasonGenerator`는 OpenAI Responses API의 JSON Schema 출력을 사용하고,
+기존 `TrendReason` contract로 변환·검증합니다. `DailyTrendReasonService`는 구체 Provider를
+알지 않으며 생성자 주입으로 교체할 수 있습니다. 자동 Gemini/OpenAI fallback은 없습니다.
+OpenAI SDK는 `pyproject.toml`에 추가했지만 현재 환경에서는 설치 여부를 확인하지 못했으며,
+OpenAI Live 호출도 수행하지 않았습니다.
+
 ### 17. Daily Trend Reason Application Service
 
 ```text
