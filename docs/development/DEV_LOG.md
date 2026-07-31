@@ -200,3 +200,37 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 
 - Movement Detection, News, LLM, Scheduler, ML, CSV/Excel/SQLite는 구현하지 않음
 - `namuwiki_trend`의 domain model과 TrendSnapshot 테이블은 재사용하지 않음
+
+## 2026-07-31 — Google Finance Sprint 3 PR 1
+
+### 구현
+
+- 검증된 두 `StockPrice`를 비교하는 순수 Movement Detection 도메인 로직을 추가함
+- `MovementDirection`, 불변 `MovementResult`, `detect_movement()` 계약을 정의함
+- `latest.current_price - previous.current_price`의 exact Decimal 비교를 적용함
+- `UP`, `DOWN`, `UNCHANGED` 방향을 명시적인 enum으로 표현함
+- symbol 불일치와 시간 순서 위반을 도메인 예외로 거부함
+- 동일한 `collected_at`은 허용하고, 입력 snapshot은 변경하지 않음
+
+### 범위와 제외
+
+- 화면의 `change_percent`와 snapshot 간 movement delta를 별도 의미로 유지함
+- threshold와 상대 변동률은 지원하지 않음
+- snapshot 부족 처리, DB 조회, Storage, CLI 연결은 후속 PR 범위로 남김
+
+## 2026-07-31 — Google Finance Sprint 3 PR 2
+
+### 구현
+
+- `StockQuoteStorage.get_latest_two()` 결과를 Movement Detection에 연결하는 application 흐름을 추가함
+- Storage는 동일 symbol snapshot 조회만 담당하고, application 흐름이 domain 계산을 호출함
+- `get_latest_two()`의 `[newest, previous]` 계약을 그대로 사용함
+- snapshot 0개와 1개는 `MovementUnavailable` 결과로 반환함
+- Storage 예외와 `MovementDetectionError`는 비교 불가 상태로 숨기지 않고 전파함
+- 입력 symbol은 기존 canonical symbol 정책을 재사용함
+
+### 범위와 제외
+
+- 화면의 `change_percent`와 snapshot movement는 서로 다른 의미로 유지함
+- CLI 연결은 PR 3 범위로 남김
+- Storage API, DB 모델, 기본 CLI와 `--save-db`는 변경하지 않음

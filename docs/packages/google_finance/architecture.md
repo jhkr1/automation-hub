@@ -19,12 +19,37 @@
   id DESC의 결정적 순서를 사용한다.
 - **Implemented**: `main.py --save-db`만 DB 저장을 활성화하며 기본 CLI 출력 동작은 유지한다.
 - **Implemented**: Fake 기반 단위 테스트와 `AAPL:NASDAQ` 실제 CLI 실행을 검증했다.
-- **Proposed**: Movement Detection, 다중 종목 순회, Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
+- **Implemented**: 검증된 두 `StockPrice`의 최신·이전 가격을 비교하는 순수 Movement Detection 도메인 로직을 제공한다.
+- **Implemented**: `get_latest_two()` 조회 결과를 Movement Detection에 연결하고, snapshot이
+  2개 미만이면 명시적인 비교 불가 결과를 반환한다.
+- **Proposed**: 다중 종목 순회와 Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
 - **Not verified**: 테스트하지 않은 시장의 DOM 차이, Google Finance selector의 장기 안정성,
   운영·상업적 사용 적합성.
-- **Not implemented**: Movement Detection, News, LLM 분석, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
+- **Not implemented**: News, LLM 분석, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
 
 ## Snapshot Storage
+
+## Movement Detection
+
+Movement Detection은 저장된 snapshot을 조회하지 않고, 호출자가 순서를 보장해 전달한 두
+`StockPrice`만 비교한다. 입력은 `latest`, `previous` 순서이며 symbol이 같고
+`latest.collected_at`이 `previous.collected_at`보다 빠르지 않아야 한다. 동일한 수집 시각은
+허용한다.
+
+가격 차이는 다음과 같이 계산한다.
+
+```text
+delta = latest.current_price - previous.current_price
+```
+
+`delta`가 양수면 `UP`, 음수면 `DOWN`, 0이면 `UNCHANGED`다. 비교는 `Decimal`의 exact
+comparison을 사용하며 threshold와 상대 변동률은 지원하지 않는다. Google Finance 화면의
+`change_percent`는 화면이 제공한 기준 시점의 변동률이고, Movement Detection의 delta는
+저장된 두 snapshot 사이의 가격 차이이므로 같은 값으로 취급하지 않는다.
+
+두 snapshot이 없거나 하나뿐인 경우를 처리하는 application 흐름, DB 조회와 CLI 연결은
+`MovementUnavailable` 결과로 표현한다. DB 오류는 이 결과로 숨기지 않고 호출자에게 전달한다.
+CLI 연결은 후속 PR의 범위다.
 
 `StockQuoteSnapshot`은 기존 `StockPrice`의 persistence 전용 표현이다. ORM row에는 `id`와
 `created_at`을 두지만 domain model에는 추가하지 않는다. 가격과 변동률은 MySQL
