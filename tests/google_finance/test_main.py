@@ -3,9 +3,13 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 from google_finance.collector import RawStockQuote
 from google_finance.main import main
 from google_finance.models import StockPrice
+from google_finance.movement import MovementDetectionError, MovementDirection, MovementResult
+from google_finance.movement_application import MovementUnavailable
 
 
 def _raw_quote() -> RawStockQuote:
@@ -135,3 +139,117 @@ def test_main_save_db_returns_one_when_storage_fails(monkeypatch, capsys) -> Non
 
     assert main(["AAPL:NASDAQ", "--save-db"]) == 1
     assert "database unavailable" in capsys.readouterr().err
+
+
+def _movement_result() -> MovementResult:
+    """Create a deterministic movement result for CLI tests."""
+    return MovementResult(
+        direction=MovementDirection.UP,
+        symbol="AAPL:NASDAQ",
+        latest_price=Decimal("101.25"),
+        previous_price=Decimal("100.10"),
+        price_delta=Decimal("1.15"),
+        latest_collected_at=datetime(2026, 7, 30, 7, 0, tzinfo=timezone.utc),
+        previous_collected_at=datetime(2026, 7, 30, 6, 0, tzinfo=timezone.utc),
+    )
+
+
+class FakeMovementStorage:
+    """Minimal storage replacement for movement CLI tests."""
+
+
+def test_main_show_movement_prints_result_without_collecting(monkeypatch, capsys) -> None:
+    """Movement mode reads the application result and skips quote collection."""
+    import google_finance.movement_application as movement_application
+
+    monkeypatch.setattr(
+        "google_finance.main.build_pipeline",
+        lambda settings: (_ for _ in ()).throw(AssertionError("quote collection is not allowed")),
+    )
+    monkeypatch.setattr(
+        movement_application,
+        "StockQuoteStorage",
+        lambda: FakeMovementStorage(),
+    )
+    monkeypatch.setattr(
+        movement_application,
+        "lookup_movement",
+        lambda storage, symbol: _movement_result(),
+    )
+
+    assert main(["AAPL:NASDAQ", "--show-movement"]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "Symbol: AAPL:NASDAQ" in captured.out
+    assert "Movement: UP" in captured.out
+    assert "Previous price: 100.10" in captured.out
+    assert "Latest price: 101.25" in captured.out
+    assert "Price delta: +1.15" in captured.out
+    assert "Previous collected at: 2026-07-30T06:00:00+00:00" in captured.out
+    assert "Latest collected at: 2026-07-30T07:00:00+00:00" in captured.out
+
+
+@pytest.mark.parametrize(
+    ("snapshot_count", "expected_message"),
+    [
+        (0, "0 snapshots found; at least 2 are required."),
+        (1, "1 snapshot found; at least 2 are required."),
+    ],
+)
+def test_main_show_movement_prints_unavailable_and_returns_zero(
+    monkeypatch,
+    capsys,
+    snapshot_count: int,
+    expected_message: str,
+) -> None:
+    """Missing comparison history is a normal stdout result."""
+    import google_finance.movement_application as movement_application
+
+    monkeypatch.setattr(movement_application, "StockQuoteStorage", lambda: FakeMovementStorage())
+    monkeypatch.setattr(
+        movement_application,
+        "lookup_movement",
+        lambda storage, symbol: MovementUnavailable(
+            symbol="AAPL:NASDAQ",
+            snapshot_count=snapshot_count,
+        ),
+    )
+
+    assert main(["AAPL:NASDAQ", "--show-movement"]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert expected_message in captured.out
+
+
+@pytest.mark.parametrize(
+    "error",
+    [RuntimeError("database unavailable"), MovementDetectionError("bad snapshots")],
+)
+def test_main_show_movement_reports_errors_on_stderr(monkeypatch, capsys, error: Exception) -> None:
+    """Database and movement contract errors return non-zero without a traceback."""
+    import google_finance.movement_application as movement_application
+
+    monkeypatch.setattr(movement_application, "StockQuoteStorage", lambda: FakeMovementStorage())
+    monkeypatch.setattr(
+        movement_application,
+        "lookup_movement",
+        lambda storage, symbol: (_ for _ in ()).throw(error),
+    )
+
+    assert main(["AAPL:NASDAQ", "--show-movement"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "실행 실패" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_main_rejects_save_db_and_show_movement_together(capsys) -> None:
+    """Collection and stored movement modes are mutually exclusive."""
+    with pytest.raises(SystemExit) as raised:
+        main(["AAPL:NASDAQ", "--save-db", "--show-movement"])
+
+    assert raised.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err

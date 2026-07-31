@@ -22,12 +22,12 @@
 - **Implemented**: 검증된 두 `StockPrice`의 최신·이전 가격을 비교하는 순수 Movement Detection 도메인 로직을 제공한다.
 - **Implemented**: `get_latest_two()` 조회 결과를 Movement Detection에 연결하고, snapshot이
   2개 미만이면 명시적인 비교 불가 결과를 반환한다.
+- **Implemented**: `--show-movement`에서 저장된 snapshot의 Movement 결과를 출력하며, 기본
+  quote 실행과 `--save-db` 모드의 동작을 유지한다.
 - **Proposed**: 다중 종목 순회와 Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
 - **Not verified**: 테스트하지 않은 시장의 DOM 차이, Google Finance selector의 장기 안정성,
   운영·상업적 사용 적합성.
 - **Not implemented**: News, LLM 분석, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
-
-## Snapshot Storage
 
 ## Movement Detection
 
@@ -49,7 +49,9 @@ comparison을 사용하며 threshold와 상대 변동률은 지원하지 않는�
 
 두 snapshot이 없거나 하나뿐인 경우를 처리하는 application 흐름, DB 조회와 CLI 연결은
 `MovementUnavailable` 결과로 표현한다. DB 오류는 이 결과로 숨기지 않고 호출자에게 전달한다.
-CLI 연결은 후속 PR의 범위다.
+CLI의 `--show-movement`는 이 application 흐름을 호출하고, 결과를 stdout에 출력한다.
+
+## Snapshot Storage
 
 `StockQuoteSnapshot`은 기존 `StockPrice`의 persistence 전용 표현이다. ORM row에는 `id`와
 `created_at`을 두지만 domain model에는 추가하지 않는다. 가격과 변동률은 MySQL
@@ -74,6 +76,20 @@ Storage transaction은 `SessionLocal.begin()`을 사용한다. 성공 시 commit
 
 `main.py` → `StockPricePipeline` → `collect_stock_quote()` → Playwright rendered DOM
 → `RawStockQuote` → `parse_stock_quote()` → `StockPrice` → stdout
+
+Movement 조회는 별도 흐름을 사용한다.
+
+```text
+main.py --show-movement
+    → StockQuoteStorage
+    → lookup_movement()
+    → detect_movement()
+    → stdout
+```
+
+기본 quote 실행에서는 DB 설정과 Storage를 로드하지 않는다. DB 관련 import와 Session 생성은
+`--save-db` 또는 `--show-movement` 분기에서만 발생한다. 두 옵션은 서로 다른 실행 의미를
+가지므로 동시에 사용할 수 없다.
 
 Collector는 symbol locator로 시작한 뒤 해당 symbol의 quote container ancestor로 범위를 제한한다.
 현재가·변동률은 current quote block 안에서 읽고, 전일 종가·시가는 container 안에서 읽는다.

@@ -234,3 +234,20 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - 화면의 `change_percent`와 snapshot movement는 서로 다른 의미로 유지함
 - CLI 연결은 PR 3 범위로 남김
 - Storage API, DB 모델, 기본 CLI와 `--save-db`는 변경하지 않음
+
+## 2026-07-31 — Google Finance Sprint 3 PR 3
+
+### 구현
+
+- 기존 CLI에 `--show-movement` 옵션을 추가함
+- Movement 모드에서는 새 quote를 수집하지 않고 저장된 snapshot만 조회함
+- `--save-db`와 `--show-movement`를 mutually exclusive 옵션으로 제한함
+- `MovementResult`와 `MovementUnavailable`을 기존 출력 계약에 맞춰 stdout으로 표시함
+- DB 설정·Storage·Movement application import는 Movement 또는 save 모드에서만 lazy 활성화함
+- DB 오류, symbol 오류와 MovementDetectionError는 stderr 및 non-zero exit code로 처리함
+
+### 범위와 제외
+
+- 기본 quote 수집과 기존 `--save-db` 동작은 유지함
+- snapshot 부족은 정상 상태로 처리하고 exit code 0을 반환함
+- 다중 종목, Scheduler, News, LLM, threshold와 상대 변동률은 구현하지 않음
