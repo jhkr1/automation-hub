@@ -116,6 +116,8 @@ automation-hub/
 ├── google_finance/
 │   ├── collector.py              # Playwright rendered quote 수집
 │   ├── extraction.py              # 가격·통화·퍼센트 정규화
+│   ├── db_models.py               # Google Finance snapshot ORM 계약
+│   ├── storage.py                 # append-only snapshot 저장·조회
 │   ├── models.py                 # StockPrice, StockReport 계약
 │   ├── pipeline.py               # 단일 종목 변환 흐름
 │   ├── main.py                   # CLI Composition Root
@@ -142,9 +144,10 @@ automation-hub/
 └── AGENTS.md                     # AI 협업 규칙
 ```
 
-`google_finance`는 현재 단일 종목 Collector, extraction, Pipeline과 CLI 실행 흐름을 제공한다.
-다중 종목·Storage·Scheduler는 아직 구현하지 않았으며, 향후 개발 시 `namuwiki_trend`의 구조를
-그대로 복사하기보다 실제 요구사항을 먼저 확인한다.
+`google_finance`는 현재 단일 종목 Collector, extraction, Pipeline, CLI와 Google Finance 전용
+append-only snapshot Storage 실행 흐름을 제공한다. Movement Detection, News, LLM, Scheduler는
+아직 구현하지 않았으며, 향후 개발 시 `namuwiki_trend`의 구조를 그대로 복사하기보다 실제
+요구사항을 먼저 확인한다.
 
 ## 4. 실행 흐름 상세 분석
 
@@ -548,10 +551,11 @@ temporary_path.replace(output_path)
 
 ### Google Finance 시작
 
-1. 현재 `google_finance`의 `collector.py`, `extraction.py`, `pipeline.py`, `main.py`와
-   패키지 문서를 함께 검토한다.
+1. 현재 `google_finance`의 `collector.py`, `extraction.py`, `pipeline.py`, `db_models.py`,
+   `storage.py`, `main.py`와 패키지 문서를 함께 검토한다.
 2. Collector는 symbol-scoped rendered DOM만 읽고, 내부 Google RPC를 사용하지 않는다.
-3. 다중 종목·Storage를 추가하기 전에 output contract와 운영 요구사항을 먼저 정한다.
+3. Movement Detection과 다중 종목을 추가하기 전에 snapshot output contract와 운영 요구사항을
+   먼저 정한다.
 4. 공통화는 실제 세 프로젝트에서 반복되는 시점까지 `shared/`를 만들지 않는다.
 
 ## 15. 개선 포인트

@@ -83,6 +83,11 @@ def _read_raw_quote(page: Page, symbol: str, *, timeout_ms: int) -> RawStockQuot
         timeout_ms=timeout_ms,
     )
     name = _wait_for_one(container.locator("div.gO24Ff"), "name", timeout_ms=timeout_ms)
+    currency_metadata = _wait_for_one(
+        container.locator("div.jZZ2de"),
+        "currency metadata",
+        timeout_ms=timeout_ms,
+    )
     previous_close = _wait_for_one(
         container.locator("div.W28Ftf"),
         "previous close",
@@ -98,7 +103,7 @@ def _read_raw_quote(page: Page, symbol: str, *, timeout_ms: int) -> RawStockQuot
         symbol=symbol,
         name_text=name.inner_text(),
         current_price_text=current_price.inner_text(),
-        currency_text=container.inner_text(),
+        currency_text=currency_metadata.inner_text(),
         previous_close_text=previous_close.inner_text(),
         open_price_text=open_price.inner_text(),
         change_percent_text=change_percent.inner_text(),

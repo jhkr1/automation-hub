@@ -183,3 +183,20 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - 내부 batchexecute/RPC 호출은 사용하지 않음
 - 테스트하지 않은 시장의 DOM 차이와 selector 장기 안정성은 확인하지 못함
 - Google Finance 데이터의 지연·정확성·사용 제한은 운영 도입 전에 별도 검토해야 함
+
+---
+
+## 2026-07-31 — Google Finance Sprint 2
+
+### 구현
+
+- Google Finance 전용 `stock_quote_snapshots` ORM 모델과 Alembic migration을 추가함
+- 기존 `database.base.Base`, Engine, SessionLocal, Alembic convention을 재사용함
+- `StockPrice`를 Decimal precision 그대로 persistence row로 변환하고 UTC timestamp를 보존함
+- append-only `StockQuoteStorage`와 `get_latest`, `get_latest_two` 조회 계약을 추가함
+- 기본 CLI stdout 동작을 유지하고 `--save-db`에서만 DB insert를 수행함
+
+### 범위
+
+- Movement Detection, News, LLM, Scheduler, ML, CSV/Excel/SQLite는 구현하지 않음
+- `namuwiki_trend`의 domain model과 TrendSnapshot 테이블은 재사용하지 않음

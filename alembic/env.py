@@ -8,6 +8,7 @@ from alembic import context
 from database import models  # noqa: F401 - register ORM metadata for Alembic
 from database.base import Base
 from database.config import DatabaseSettings
+from google_finance import db_models  # noqa: F401 - register ORM metadata for Alembic
 
 config = context.config
 

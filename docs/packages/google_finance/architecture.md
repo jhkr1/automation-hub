@@ -13,11 +13,37 @@
 - **Implemented**: `pipeline.py`는 Collector callable을 주입받아 한 종목을 변환한다.
 - **Implemented**: `main.py`는 단일 symbol CLI와 출력 경계를 제공한다.
 - **Implemented**: 현재 영어 화면 파싱 계약에 맞춰 `en-US` locale만 허용한다.
+- **Implemented**: `db_models.py`의 `StockQuoteSnapshot`과 `storage.py`의 append-only MySQL
+  Storage를 제공한다.
+- **Implemented**: `get_latest(symbol)`과 `get_latest_two(symbol)`은 collected_at DESC,
+  id DESC의 결정적 순서를 사용한다.
+- **Implemented**: `main.py --save-db`만 DB 저장을 활성화하며 기본 CLI 출력 동작은 유지한다.
 - **Implemented**: Fake 기반 단위 테스트와 `AAPL:NASDAQ` 실제 CLI 실행을 검증했다.
-- **Proposed**: 다중 종목 순회, Storage, Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
+- **Proposed**: Movement Detection, 다중 종목 순회, Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
 - **Not verified**: 테스트하지 않은 시장의 DOM 차이, Google Finance selector의 장기 안정성,
   운영·상업적 사용 적합성.
-- **Not implemented**: DB·Excel 저장, 다중 종목 실행, Scheduler, LLM 분석, 내부 RPC 호출.
+- **Not implemented**: Movement Detection, News, LLM 분석, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
+
+## Snapshot Storage
+
+`StockQuoteSnapshot`은 기존 `StockPrice`의 persistence 전용 표현이다. ORM row에는 `id`와
+`created_at`을 두지만 domain model에는 추가하지 않는다. 가격과 변동률은 MySQL
+`DECIMAL`로 저장하고, `collected_at`과 `created_at`은 기존 DB convention에 따라 naive UTC
+`DATETIME`으로 저장한다. ORM 변환 경계에서 domain timestamp는 timezone-aware UTC로 복원한다.
+현재 price와 percent의 scale은 모두 8이며, 8자리 초과 Decimal은 저장 전에 명시적으로
+거부한다. 따라서 DB의 암묵적 반올림에 의존하지 않는다.
+
+`stock_quote_snapshots`는 기존 `trend_snapshots`와 분리된 Google Finance 전용 테이블이다.
+`(symbol, collected_at)` 인덱스를 사용하며, timestamp 정밀도와 재실행 정책이 확정되지 않은
+상태에서 강한 unique constraint는 추가하지 않았다. 저장은 update/upsert/delete 없이
+append-only insert만 수행한다.
+
+Storage transaction은 `SessionLocal.begin()`을 사용한다. 성공 시 commit하고 DB 예외는
+호출자에게 전달되어 rollback되며, Storage는 Collector·Movement Detection·News·LLM을
+호출하지 않는다.
+
+필요한 환경변수는 기존 `DATABASE_URL`이다. 기본 CLI에는 DB 설정이 필요하지 않고,
+`--save-db`를 사용할 때만 기존 database Session 인프라를 lazy import한다.
 
 ## 데이터 흐름
 

@@ -14,6 +14,11 @@ def _build_parser() -> argparse.ArgumentParser:
     """Build the single-symbol command-line parser."""
     parser = argparse.ArgumentParser(description="Display one Google Finance quote.")
     parser.add_argument("symbol", help="exchange-qualified symbol, for example AAPL:NASDAQ")
+    parser.add_argument(
+        "--save-db",
+        action="store_true",
+        help="append the collected quote to the configured MySQL database",
+    )
     return parser
 
 
@@ -45,7 +50,13 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         settings = Settings()
-        _print_stock_price(build_pipeline(settings).run(args.symbol))
+        stock_price = build_pipeline(settings).run(args.symbol)
+        _print_stock_price(stock_price)
+        if args.save_db:
+            from google_finance.storage import StockQuoteStorage
+
+            StockQuoteStorage().save(stock_price)
+            print("Saved quote snapshot to database.")
     except Exception as exc:  # noqa: BLE001 - process boundary converts failure to exit code
         print(f"[google_finance] 실행 실패: {exc}", file=sys.stderr)
         return 1

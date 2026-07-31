@@ -132,6 +132,7 @@ def _fake_runtime() -> tuple[FakePlaywright, FakePage, FakeBrowser, FakeContext]
         children={
             "div.ujg0He": current,
             "div.gO24Ff": FakeLocator(text="Apple Inc"),
+            "div.jZZ2de": FakeLocator(text="Closed: Jul 29 · USD"),
             "div.W28Ftf": FakeLocator(text="Prev. close $340.08"),
             "div.KxsRFb": FakeLocator(
                 children={"open": FakeLocator(text="Open\n$339.73")}

@@ -9,7 +9,7 @@ Automation Anywhere에서 다뤘던 자동화를 Python의 명시적인 모델, 
 | 패키지 | 상태 |
 |---|---|
 | `namuwiki_trend` | Top 10 수집, enrichment, JSON·DB snapshot과 Daily Trend 조회 구현 |
-| `google_finance` | 단일 종목 Google Finance 시세 수집·정규화·CLI 구현 |
+| `google_finance` | 단일 종목 시세 수집·정규화·MySQL snapshot 저장·CLI 구현 |
 
 패키지별 실행 방법과 제한사항은 [`docs/packages/`](docs/packages/)에서 확인합니다.
 
@@ -33,6 +33,7 @@ Google Finance는 exchange-qualified symbol 하나를 받아 실행할 수 있�
 
 ```bash
 python -m google_finance.main AAPL:NASDAQ
+python -m google_finance.main AAPL:NASDAQ --save-db
 ```
 
 실행에는 대상 외부 서비스, 환경변수와 경우에 따라 MySQL이 필요합니다. 자세한 운영 절차는
@@ -62,9 +63,10 @@ python scripts/verify.py
 ## 현재 범위와 미구현 범위
 
 `namuwiki_trend`의 현재 구현 범위는 패키지 문서와 코드에 근거합니다. `google_finance`는
-현재 단일 종목의 Playwright 수집·정규화·CLI까지 구현되어 있으며, 다중 종목 실행, Storage,
-Scheduler, DB·Excel 연동과 LLM 분석은 구현하지 않았습니다. Google Finance의 내부 RPC는
-사용하지 않으며, selector 안정성과 테스트하지 않은 시장은 확인되지 않은 상태입니다.
+현재 단일 종목의 Playwright 수집·정규화·MySQL snapshot 저장·CLI까지 구현되어 있으며,
+Movement Detection, News, LLM, Scheduler, DB 외 저장 형식은 구현하지 않았습니다. Google
+Finance의 내부 RPC는 사용하지 않으며, selector 안정성과 테스트하지 않은 시장은 확인되지 않은
+상태입니다.
 
 공통 원칙은 [docs/architecture.md](docs/architecture.md)에, 패키지별 세부사항은
 [`docs/packages/`](docs/packages/)에 기록합니다.

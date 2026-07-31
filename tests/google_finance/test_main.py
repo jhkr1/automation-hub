@@ -80,3 +80,58 @@ def test_main_returns_one_for_collection_failure(monkeypatch, capsys) -> None:
 
     assert main(["AAPL:NASDAQ"]) == 1
     assert "실행 실패" in capsys.readouterr().err
+
+
+def test_main_does_not_save_to_db_by_default(monkeypatch) -> None:
+    """The existing command remains a collector-only execution by default."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    monkeypatch.setattr(
+        "google_finance.main.build_pipeline",
+        lambda settings: FakePipeline(_stock_price()),
+    )
+
+    class UnexpectedStorage:
+        def __init__(self) -> None:
+            raise AssertionError("storage must not be constructed")
+
+    monkeypatch.setattr("google_finance.storage.StockQuoteStorage", UnexpectedStorage)
+
+    assert main(["AAPL:NASDAQ"]) == 0
+
+
+def test_main_save_db_calls_storage_after_stdout(monkeypatch, capsys) -> None:
+    """The explicit option saves the collected domain snapshot."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    monkeypatch.setattr(
+        "google_finance.main.build_pipeline",
+        lambda settings: FakePipeline(_stock_price()),
+    )
+    saved: list[StockPrice] = []
+
+    class FakeStorage:
+        def save(self, stock_price: StockPrice) -> None:
+            saved.append(stock_price)
+
+    monkeypatch.setattr("google_finance.storage.StockQuoteStorage", FakeStorage)
+
+    assert main(["AAPL:NASDAQ", "--save-db"]) == 0
+    assert saved == [_stock_price()]
+    assert "Current price: 338.19 USD" in capsys.readouterr().out
+
+
+def test_main_save_db_returns_one_when_storage_fails(monkeypatch, capsys) -> None:
+    """A database failure is visible on stderr and returns a non-zero code."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    monkeypatch.setattr(
+        "google_finance.main.build_pipeline",
+        lambda settings: FakePipeline(_stock_price()),
+    )
+
+    class FailingStorage:
+        def save(self, stock_price: StockPrice) -> None:
+            raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr("google_finance.storage.StockQuoteStorage", FailingStorage)
+
+    assert main(["AAPL:NASDAQ", "--save-db"]) == 1
+    assert "database unavailable" in capsys.readouterr().err
