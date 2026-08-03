@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from google import genai
+from google.genai.errors import ClientError
 
 from google_finance.models import (
     MAX_STOCK_INSIGHT_SUMMARY_LENGTH,
@@ -21,6 +22,27 @@ MAX_SUMMARY_LENGTH = MAX_STOCK_INSIGHT_SUMMARY_LENGTH
 INSUFFICIENT_EVIDENCE_REASON = (
     "관련 뉴스 근거가 부족해 최근 가격 변동의 가능한 배경을 확인할 수 없습니다."
 )
+DAILY_QUOTA_MARKERS = (
+    "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+    "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+)
+
+
+class GeminiDailyQuotaExhaustedError(RuntimeError):
+    """Safe internal signal for a daily Gemini request quota exhaustion."""
+
+    def __init__(self) -> None:
+        super().__init__("Gemini daily request quota exhausted")
+
+
+def is_daily_quota_exhausted(error: BaseException) -> bool:
+    """Identify the documented daily free-tier quota error without exposing details."""
+    if not isinstance(error, ClientError):
+        return False
+    if error.code != 429 or error.status != "RESOURCE_EXHAUSTED":
+        return False
+    details = repr(getattr(error, "details", ""))
+    return any(marker in details for marker in DAILY_QUOTA_MARKERS)
 
 
 def build_analysis_prompt(
@@ -128,7 +150,14 @@ class GeminiStockInsightGenerator:
         """Generate a validated summary, or a fallback without an API call."""
         if not articles:
             return INSUFFICIENT_EVIDENCE_REASON
-        response = self._generate_content(build_analysis_prompt(stock_price, movement, articles))
+        try:
+            response = self._generate_content(
+                build_analysis_prompt(stock_price, movement, articles)
+            )
+        except ClientError as exc:
+            if is_daily_quota_exhausted(exc):
+                raise GeminiDailyQuotaExhaustedError() from exc
+            raise
         text = getattr(response, "text", None)
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("Gemini response text is empty or invalid")

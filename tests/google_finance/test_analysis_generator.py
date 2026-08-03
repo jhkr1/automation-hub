@@ -5,11 +5,13 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from google.genai.errors import ClientError
 
 from google_finance.analysis_generator import (
     DEFAULT_MODEL,
     INSUFFICIENT_EVIDENCE_REASON,
     MAX_SUMMARY_LENGTH,
+    GeminiDailyQuotaExhaustedError,
     GeminiStockInsightGenerator,
     build_analysis_prompt,
 )
@@ -25,6 +27,12 @@ class FakeModels:
     def generate_content(self, *, model: str, contents: str) -> object:
         self.calls.append({"model": model, "contents": contents})
         return self.response
+
+
+class RaisingModels(FakeModels):
+    def generate_content(self, *, model: str, contents: str) -> object:
+        self.calls.append({"model": model, "contents": contents})
+        raise self.response
 
 
 def _quote() -> StockPrice:
@@ -132,3 +140,47 @@ def test_generator_rejects_summary_over_sentence_limit() -> None:
 
     with pytest.raises(ValueError, match="2 sentences"):
         generator.generate_summary(_quote(), _movement(), [_article()])
+
+
+def test_generator_classifies_daily_quota_without_exposing_provider_details() -> None:
+    quota_error = ClientError(
+        429,
+        {
+            "error": {
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "sensitive project details",
+                "details": [
+                    {
+                        "quotaMetric": (
+                            "generativelanguage.googleapis.com/"
+                            "generate_content_free_tier_requests"
+                        ),
+                        "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                    }
+                ],
+            }
+        },
+    )
+    models = RaisingModels(quota_error)
+    generator = GeminiStockInsightGenerator(client=SimpleNamespace(models=models))
+
+    with pytest.raises(GeminiDailyQuotaExhaustedError) as raised:
+        generator.generate_summary(_quote(), _movement(), [_article()])
+
+    assert str(raised.value) == "Gemini daily request quota exhausted"
+    assert len(models.calls) == 1
+
+
+def test_generator_keeps_non_daily_client_error_as_provider_failure() -> None:
+    error = ClientError(
+        429,
+        {"error": {"status": "RESOURCE_EXHAUSTED", "message": "temporary limit"}},
+    )
+    generator = GeminiStockInsightGenerator(
+        client=SimpleNamespace(models=RaisingModels(error)),
+    )
+
+    with pytest.raises(ClientError) as raised:
+        generator.generate_summary(_quote(), _movement(), [_article()])
+
+    assert raised.value is error

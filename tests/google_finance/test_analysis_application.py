@@ -6,8 +6,14 @@ from decimal import Decimal
 
 import pytest
 
-from google_finance.analysis_application import analyze_stored_quote
-from google_finance.analysis_generator import INSUFFICIENT_EVIDENCE_REASON
+from google_finance.analysis_application import (
+    GeminiAnalysisUnavailableError,
+    analyze_stored_quote,
+)
+from google_finance.analysis_generator import (
+    INSUFFICIENT_EVIDENCE_REASON,
+    GeminiDailyQuotaExhaustedError,
+)
 from google_finance.models import (
     MAX_STOCK_INSIGHT_SUMMARY_LENGTH,
     StockInsight,
@@ -73,6 +79,17 @@ class FakeGenerator:
         return self.result
 
 
+class QuotaGenerator(FakeGenerator):
+    def generate_summary(
+        self,
+        stock_price: StockPrice,
+        movement: MovementResult,
+        articles: list[StockNewsArticle],
+    ) -> str:
+        self.calls.append((stock_price, movement, articles))
+        raise GeminiDailyQuotaExhaustedError()
+
+
 def _article() -> StockNewsArticle:
     return StockNewsArticle(title="Apple news", url="https://news.example/apple")
 
@@ -118,6 +135,17 @@ def test_analyze_stored_quote_skips_generator_when_news_is_empty() -> None:
     assert isinstance(result, StockInsight)
     assert result.summary == INSUFFICIENT_EVIDENCE_REASON
     assert generator.calls == []
+
+
+def test_analyze_stored_quote_preserves_context_on_daily_quota() -> None:
+    storage = FakeStorage([_quote("101.00", LATER), _quote("100.00", EARLIER)])
+    news = FakeNewsProvider([_article()])
+
+    with pytest.raises(GeminiAnalysisUnavailableError) as raised:
+        analyze_stored_quote(storage, news, QuotaGenerator(), "AAPL:NASDAQ")
+
+    assert raised.value.movement.price_delta == Decimal("1.00")
+    assert raised.value.news_count == 1
 
 
 def test_stock_insight_is_immutable() -> None:

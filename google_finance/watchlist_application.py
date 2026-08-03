@@ -4,8 +4,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
+from google_finance.analysis_application import GeminiAnalysisUnavailableError
 from google_finance.models import StockInsight, StockPrice
-from google_finance.movement import MovementDetectionError
+from google_finance.movement import MovementDetectionError, MovementResult
 from google_finance.movement_application import MovementUnavailable
 
 
@@ -28,6 +29,7 @@ class WatchlistAnalysisStatus(str, Enum):
 
     SUCCESS = "SUCCESS"
     MOVEMENT_UNAVAILABLE = "MOVEMENT_UNAVAILABLE"
+    ANALYSIS_UNAVAILABLE = "ANALYSIS_UNAVAILABLE"
     FAILED = "FAILED"
 
 
@@ -36,6 +38,12 @@ class WatchlistAnalysisErrorStage(str, Enum):
 
     MOVEMENT = "MOVEMENT"
     ANALYSIS = "ANALYSIS"
+
+
+class WatchlistAnalysisUnavailableReason(str, Enum):
+    """Expected reasons for an analysis that cannot produce StockInsight."""
+
+    DAILY_QUOTA_EXHAUSTED = "DAILY_QUOTA_EXHAUSTED"
 
 
 @dataclass(frozen=True)
@@ -78,6 +86,9 @@ class WatchlistAnalysisResult:
     analysis: StockInsight | MovementUnavailable | None = None
     error_stage: WatchlistAnalysisErrorStage | None = None
     error_message: str | None = None
+    unavailable_reason: WatchlistAnalysisUnavailableReason | None = None
+    movement: MovementResult | None = None
+    news_count: int | None = None
 
     def __post_init__(self) -> None:
         """Reject combinations that do not describe a valid result state."""
@@ -86,13 +97,27 @@ class WatchlistAnalysisResult:
         if self.status is WatchlistAnalysisStatus.SUCCESS:
             if not isinstance(self.analysis, StockInsight):
                 raise ValueError("successful analysis must contain StockInsight")
-            if self.error_stage is not None or self.error_message:
+            if (
+                self.error_stage is not None
+                or self.error_message
+                or self.unavailable_reason is not None
+            ):
                 raise ValueError("successful analysis must not contain an error")
         elif self.status is WatchlistAnalysisStatus.MOVEMENT_UNAVAILABLE:
             if not isinstance(self.analysis, MovementUnavailable):
                 raise ValueError("unavailable analysis must contain MovementUnavailable")
             if self.error_stage is not None or self.error_message:
                 raise ValueError("unavailable analysis must not contain an error")
+        elif self.status is WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE:
+            if (
+                self.analysis is not None
+                or self.unavailable_reason is None
+                or self.error_stage is not None
+                or self.error_message
+            ):
+                raise ValueError("unavailable analysis must contain a reason")
+            if self.news_count is not None and self.news_count < 0:
+                raise ValueError("news_count must not be negative")
         elif self.status is WatchlistAnalysisStatus.FAILED:
             if self.analysis is not None or self.error_stage is None or not self.error_message:
                 raise ValueError("failed analysis must contain an error")
@@ -171,9 +196,31 @@ def analyze_watchlist(
 ) -> list[WatchlistAnalysisResult]:
     """Analyze symbols sequentially through the existing single-symbol application."""
     results: list[WatchlistAnalysisResult] = []
+    gemini_available = True
     for symbol in _require_symbols(symbols):
+        if not gemini_available:
+            results.append(
+                WatchlistAnalysisResult(
+                    symbol=symbol,
+                    status=WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE,
+                    unavailable_reason=WatchlistAnalysisUnavailableReason.DAILY_QUOTA_EXHAUSTED,
+                )
+            )
+            continue
         try:
             analysis = analyze_one(symbol)
+        except GeminiAnalysisUnavailableError as exc:
+            gemini_available = False
+            results.append(
+                WatchlistAnalysisResult(
+                    symbol=symbol,
+                    status=WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE,
+                    unavailable_reason=WatchlistAnalysisUnavailableReason.DAILY_QUOTA_EXHAUSTED,
+                    movement=exc.movement,
+                    news_count=exc.news_count,
+                )
+            )
+            continue
         except MovementDetectionError as exc:
             results.append(
                 WatchlistAnalysisResult(

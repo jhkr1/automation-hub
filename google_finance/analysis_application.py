@@ -3,7 +3,10 @@
 from datetime import datetime, timezone
 from typing import Protocol
 
-from google_finance.analysis_generator import INSUFFICIENT_EVIDENCE_REASON
+from google_finance.analysis_generator import (
+    INSUFFICIENT_EVIDENCE_REASON,
+    GeminiDailyQuotaExhaustedError,
+)
 from google_finance.collector import validate_symbol
 from google_finance.models import StockInsight, StockNewsArticle, StockPrice
 from google_finance.movement import MovementResult, detect_movement
@@ -30,6 +33,15 @@ class StockAnalysisGenerator(Protocol):
         """Generate a summary from validated quote, movement, and news."""
 
 
+class GeminiAnalysisUnavailableError(RuntimeError):
+    """Preserve analysis context when Gemini daily quota is exhausted."""
+
+    def __init__(self, movement: MovementResult, news_count: int) -> None:
+        self.movement = movement
+        self.news_count = news_count
+        super().__init__("Gemini analysis unavailable: daily quota exhausted")
+
+
 def analyze_stored_quote(
     storage: StockQuoteStorage,
     news_provider: StockNewsProvider,
@@ -48,11 +60,13 @@ def analyze_stored_quote(
     previous = snapshots[1]
     movement = detect_movement(latest=latest, previous=previous)
     articles = news_provider.search(latest.name, limit=news_limit)
-    summary = (
-        generator.generate_summary(latest, movement, articles)
-        if articles
-        else INSUFFICIENT_EVIDENCE_REASON
-    )
+    if articles:
+        try:
+            summary = generator.generate_summary(latest, movement, articles)
+        except GeminiDailyQuotaExhaustedError as exc:
+            raise GeminiAnalysisUnavailableError(movement, len(articles)) from exc
+    else:
+        summary = INSUFFICIENT_EVIDENCE_REASON
     return StockInsight(
         symbol=latest.symbol,
         company_name=latest.name,

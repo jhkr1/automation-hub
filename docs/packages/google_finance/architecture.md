@@ -33,7 +33,7 @@
 - **Proposed**: 다중 종목 순회와 Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
 - **Not verified**: 테스트하지 않은 시장의 DOM 차이, Google Finance selector의 장기 안정성,
   운영·상업적 사용 적합성.
-- **Not implemented**: 분석 결과 저장, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
+- **Not implemented**: Scheduler, Excel/CSV/SQLite 저장, 분석 결과 저장, 내부 RPC 호출.
 
 ## Analysis Application
 
@@ -60,6 +60,36 @@ main.py --analyze
 분석 결과로 숨기지 않고 CLI 실패로 전달한다. Gemini 요약은 공개 뉴스에 근거한 한국어
 일반 텍스트이며 최대 2문장·400자 이하로 제한한다. 인과관계를 단정하거나 투자
 권유·목표 주가·매수/매도 판단을 생성하지 않도록 요청한다.
+
+## Watchlist Application
+
+Watchlist CLI는 설정된 symbol을 입력 순서대로 하나씩 실행한다. CLI는 흐름을 조립하고 결과를
+출력하며, 실제 수집·저장·분석은 기존 단일 종목 API에 위임한다.
+
+```text
+STOCK_SYMBOLS
+    → Settings.get_symbol_list()
+    → watchlist_main.py
+        ├─ --collect → StockPricePipeline → StockQuoteStorage.save()
+        └─ --analyze → get_latest_two() → Movement → News → Gemini → StockInsight
+```
+
+`watchlist_application.py`는 종목별 결과를 불변 결과 객체로 모으고 한 종목의 실패를 다음
+종목에 전파하지 않는다. 수집 결과는 성공 또는 수집·저장 실패를, 분석 결과는 성공,
+`MOVEMENT_UNAVAILABLE`, 분석 실패를 구분한다. 외부 예외의 민감한 본문과 traceback은 결과에
+보존하지 않고 예외 타입과 안전한 단계 요약만 남긴다. 하나 이상의 실패가 있으면 Watchlist
+CLI는 종료 코드 1을 반환한다.
+
+수집 모드에서는 News Provider와 Gemini를 생성하지 않으며, 분석 모드에서는 브라우저 수집을
+실행하지 않는다. 두 모드 모두 기존 단일 종목 흐름을 재사용하고, retry·sleep·parallel 실행은
+지원하지 않는다.
+
+Gemini의 `429 RESOURCE_EXHAUSTED`가 일일 무료 요청 quota인 것으로 확인되면, 해당 분석 실행의
+application 범위에서만 quota 상태를 기억한다. 첫 실패는 `ANALYSIS_UNAVAILABLE`과
+`DAILY_QUOTA_EXHAUSTED` reason으로 표현하고, 이후 symbol은 Gemini를 호출하지 않고 같은
+상태로 반환한다. 첫 실패 시점에 계산된 Movement와 뉴스 개수는 결과에 보존할 수 있으며,
+원본 SDK 오류·API key·traceback은 CLI 출력에 포함하지 않는다. 일일 quota가 아닌 429는
+이번 범위에서 자동 재시도하지 않고 기존 분석 실패 계약을 유지한다.
 
 ## Movement Detection
 

@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from google_finance.analysis_application import GeminiAnalysisUnavailableError
 from google_finance.models import StockInsight, StockPrice
 from google_finance.movement import MovementDetectionError, MovementDirection, MovementResult
 from google_finance.movement_application import MovementUnavailable
@@ -13,6 +14,7 @@ from google_finance.watchlist_application import (
     WatchlistAnalysisErrorStage,
     WatchlistAnalysisResult,
     WatchlistAnalysisStatus,
+    WatchlistAnalysisUnavailableReason,
     WatchlistCollectErrorStage,
     WatchlistCollectResult,
     WatchlistCollectStatus,
@@ -190,6 +192,31 @@ def test_analyze_watchlist_treats_empty_news_insight_as_success() -> None:
 
     assert results[0].status is WatchlistAnalysisStatus.SUCCESS
     assert results[0].analysis is insight
+
+
+def test_analyze_watchlist_stops_after_daily_quota_and_preserves_first_context() -> None:
+    calls: list[str] = []
+
+    def analyze_one(symbol: str) -> StockInsight:
+        calls.append(symbol)
+        if symbol == "NVDA:NASDAQ":
+            raise GeminiAnalysisUnavailableError(_movement(symbol), news_count=5)
+        return _insight(symbol)
+
+    results = analyze_watchlist(SYMBOLS, analyze_one)
+
+    assert calls == ["NVDA:NASDAQ"]
+    assert all(
+        result.status is WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE for result in results
+    )
+    assert all(
+        result.unavailable_reason is WatchlistAnalysisUnavailableReason.DAILY_QUOTA_EXHAUSTED
+        for result in results
+    )
+    assert results[0].movement == _movement("NVDA:NASDAQ")
+    assert results[0].news_count == 5
+    assert results[1].movement is None
+    assert results[1].news_count is None
 
 
 def test_analyze_watchlist_continues_after_analysis_failure() -> None:

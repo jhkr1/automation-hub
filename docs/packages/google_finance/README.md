@@ -11,9 +11,10 @@ Google Finance 관련 자동화를 위한 독립 패키지다.
 - **Implemented**: Google Finance 전용 MySQL append-only snapshot Storage와 `--save-db` 옵션
 - **Implemented**: `--show-movement` 옵션으로 저장된 최신 두 snapshot의 변동 결과 조회
 - **Implemented**: `--analyze` 옵션으로 저장된 최신 두 snapshot과 Google News, Gemini를 연결한 CLI 분석 출력
+- **Implemented**: `STOCK_SYMBOLS` Watchlist를 순차 수집·저장·분석하는 `watchlist_main.py` CLI
 - **Implemented**: Fake 기반 단위 테스트와 `AAPL:NASDAQ` 실제 CLI 검증
 - **Not verified**: `en-US` 외 locale, 테스트하지 않은 거래소·종목의 DOM 차이, 장기적인 Google Finance selector 안정성
-- **Not implemented**: 다중 종목 실행, Scheduler, DB 외 저장 형식, 분석 결과 저장, threshold, 상대 변동률
+- **Not implemented**: Scheduler, DB 외 저장 형식, 분석 결과 저장, threshold, 상대 변동률
 
 ## 다음 범위
 
@@ -25,6 +26,31 @@ python -m google_finance.main AAPL:NASDAQ --save-db
 python -m google_finance.main AAPL:NASDAQ --show-movement
 python -m google_finance.main AAPL:NASDAQ --analyze
 ```
+
+Watchlist는 `.env`의 `STOCK_SYMBOLS`를 사용한다. 쉼표로 구분한 symbol을 검증하고
+canonicalization한 뒤 입력 순서를 유지하여 순차 실행한다. 이 값은 코드에 내장된 기본 목록이
+아니라 사용자가 수정하는 설정이다.
+
+```env
+STOCK_SYMBOLS=NVDA:NASDAQ,PLTR:NASDAQ,005930:KRX,000660:KRX
+```
+
+```bash
+python -m google_finance.watchlist_main --collect
+python -m google_finance.watchlist_main --analyze
+```
+
+`--collect`는 기존 단일 종목 Pipeline과 Storage를 각 symbol에 재사용한다. `--analyze`는
+기존 snapshot 조회, Movement, Google News, Gemini 분석 흐름을 각 symbol에 재사용한다.
+한 symbol의 실패가 다음 symbol을 막지는 않지만 하나라도 실패하면 종료 코드는 1이다.
+Movement에 필요한 snapshot이 부족한 경우는 정상적인 `MOVEMENT_UNAVAILABLE` 상태로 출력되고
+종료 코드는 0이다. 수집은 `DATABASE_URL`만 필요하고, 분석은 여기에 `GEMINI_API_KEY`가
+추가로 필요하다.
+
+Gemini 무료 계정의 일일 요청 quota가 소진되면 Watchlist는 재시도하지 않는다. 첫 quota 오류
+이후 같은 실행의 후속 Gemini 호출을 중단하고 각 종목을 `ANALYSIS_UNAVAILABLE`로 출력한다.
+가격·Movement·뉴스를 확보한 첫 종목의 일부 분석 정보는 보존하지만, 이 상태가 있으면 종료
+코드는 1이다. Batch 요청이나 분석 결과 캐시는 현재 지원하지 않는다.
 
 현재 Collector와 parser는 검증된 영어 화면 계약에 따라 `en-US` locale만 허용한다.
 Google Finance의 렌더링 DOM에서 수집한 문자열은 `extraction.py`에서 검증·정규화한 뒤
