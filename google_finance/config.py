@@ -16,11 +16,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     """google_finance 프로젝트에 필요한 환경변수를 정의한다.
 
-    .env 파일에서 자동으로 로딩하며, 필수 값이 누락되면
-    애플리케이션 시작 시점에 ValidationError로 즉시 실패한다.
+    .env 파일에서 자동으로 로딩한다. ``STOCK_SYMBOLS``는 단일 종목 CLI를
+    방해하지 않도록 빈 기본값을 가지며, Watchlist가 ``get_symbol_list()``를
+    호출할 때 비어 있으면 설정 오류로 처리한다.
     """
 
-    stock_symbols: str = "AAPL,GOOGL,MSFT"
+    stock_symbols: str = ""
     google_finance_locale: str = "en-US"
     gemini_api_key: str | None = None
     log_level: str = "INFO"
@@ -31,8 +32,25 @@ class Settings(BaseSettings):
     )
 
     def get_symbol_list(self) -> list[str]:
-        """쉼표로 구분된 종목 코드 문자열을 리스트로 변환한다."""
-        return [s.strip() for s in self.stock_symbols.split(",") if s.strip()]
+        """Parse, validate, canonicalize, and deduplicate Watchlist symbols.
+
+        The collector owns the symbol grammar, so this method reuses its validator
+        lazily to avoid a module-level circular import.
+        """
+        raw_symbols = self.stock_symbols.split(",")
+        if not self.stock_symbols.strip() or any(not symbol.strip() for symbol in raw_symbols):
+            raise ValueError("STOCK_SYMBOLS must contain at least one non-empty symbol")
+
+        from google_finance.collector import validate_symbol
+
+        symbols: list[str] = []
+        seen: set[str] = set()
+        for raw_symbol in raw_symbols:
+            symbol = validate_symbol(raw_symbol)
+            if symbol not in seen:
+                seen.add(symbol)
+                symbols.append(symbol)
+        return symbols
 
 
 def get_logger(name: str, level: str = "INFO") -> logging.Logger:
