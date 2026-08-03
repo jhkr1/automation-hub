@@ -56,7 +56,7 @@ Package README는 실행 방법과 현재 기능의 기준 문서입니다. Pack
 | Understand the repository architecture | [Root Architecture](docs/architecture.md) |
 | Explore the code | [CODEBASE_GUIDE.md](CODEBASE_GUIDE.md) |
 | Prepare an operating environment | [Operations](docs/operations/README.md) |
-| Learn architecture from this project | [Handbook Chapter 1](docs/handbook/01-redesigning-automation-with-python.md) |
+| Learn architecture from this project | [Architecture Handbook](docs/handbook/README.md) |
 | Read design decisions | [Decision Records](docs/decisions/README.md) |
 | Read development history | [DEV_LOG.md](docs/development/DEV_LOG.md) |
 
@@ -73,7 +73,7 @@ flowchart TD
     Explore --> CodeGuide[CODEBASE_GUIDE.md]
     Architecture --> RootArchitecture[docs/architecture.md]
     Operate --> Operations[docs/operations/README.md]
-    Learn --> Handbook[Handbook Chapter 1]
+    Learn --> Handbook[Architecture Handbook]
     History --> DevLog[docs/development/DEV_LOG.md]
 ```
 
@@ -107,7 +107,7 @@ python scripts/verify.py
 
 - [Package README](docs/packages/): 실행 가능한 명령과 환경 조건을 확인합니다.
 - [Root Architecture](docs/architecture.md): Monorepo와 Package 경계를 이해합니다.
-- [Handbook Chapter 1](docs/handbook/01-redesigning-automation-with-python.md): 프로젝트 사례를 통해 설계 판단을 학습합니다.
+- [Architecture Handbook](docs/handbook/README.md): Chapter 1부터 8까지 프로젝트 사례를 통해 설계 판단을 학습합니다.
 
 ## Related Documents
 
