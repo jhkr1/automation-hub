@@ -4,9 +4,11 @@ import argparse
 import sys
 from decimal import Decimal
 
+from pydantic import ValidationError
+
 from google_finance.collector import collect_stock_quote
 from google_finance.config import Settings
-from google_finance.models import StockPrice
+from google_finance.models import StockInsight, StockPrice
 from google_finance.movement import MovementResult
 from google_finance.pipeline import StockPricePipeline
 
@@ -25,6 +27,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--show-movement",
         action="store_true",
         help="show movement between the latest stored snapshots",
+    )
+    mode_group.add_argument(
+        "--analyze",
+        action="store_true",
+        help="analyze movement between the latest stored snapshots with related news",
     )
     return parser
 
@@ -72,6 +79,38 @@ def _print_movement_unavailable(symbol: str, snapshot_count: int) -> None:
     )
 
 
+def _print_stock_insight(insight: StockInsight) -> None:
+    """Print a stable human-readable stock analysis result."""
+    print(f"Symbol: {insight.symbol}")
+    print(f"Name: {insight.company_name}")
+    print(f"Movement: {insight.movement.direction.value}")
+    print(f"Price delta: {insight.movement.price_delta:+.2f}")
+    print(f"Google Finance change: {insight.change_percent:.2f}%")
+    print(f"News articles: {len(insight.news)}")
+    print(f"Summary: {insight.summary}")
+
+
+def _run_analysis(symbol: str, settings: Settings) -> None:
+    """Analyze stored movement without collecting or saving a new quote."""
+    from google_finance.analysis_application import analyze_stored_quote
+    from google_finance.analysis_generator import GeminiStockInsightGenerator
+    from google_finance.movement_application import MovementUnavailable
+    from google_finance.news import GoogleFinanceNewsProvider
+    from google_finance.storage import StockQuoteStorage
+
+    result = analyze_stored_quote(
+        StockQuoteStorage(),
+        GoogleFinanceNewsProvider(),
+        GeminiStockInsightGenerator(api_key=settings.gemini_api_key),
+        symbol,
+    )
+    if isinstance(result, StockInsight):
+        _print_stock_insight(result)
+    elif isinstance(result, MovementUnavailable):
+        _print_movement_unavailable(result.symbol, result.snapshot_count)
+    else:
+        raise TypeError("analysis application returned an unsupported result")
+
 def _run_movement(symbol: str) -> None:
     """Look up stored snapshots and print their movement without collecting a quote."""
     from google_finance import movement_application
@@ -97,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         settings = Settings()
+        if args.analyze:
+            _run_analysis(args.symbol, settings)
+            return 0
         stock_price = build_pipeline(settings).run(args.symbol)
         _print_stock_price(stock_price)
         if args.save_db:
@@ -104,6 +146,9 @@ def main(argv: list[str] | None = None) -> int:
 
             StockQuoteStorage().save(stock_price)
             print("Saved quote snapshot to database.")
+    except ValidationError:  # noqa: BLE001 - process boundary hides settings input values
+        print("[google_finance] 실행 실패: 설정 오류", file=sys.stderr)
+        return 1
     except Exception as exc:  # noqa: BLE001 - process boundary converts failure to exit code
         print(f"[google_finance] 실행 실패: {exc}", file=sys.stderr)
         return 1

@@ -24,10 +24,42 @@
   2개 미만이면 명시적인 비교 불가 결과를 반환한다.
 - **Implemented**: `--show-movement`에서 저장된 snapshot의 Movement 결과를 출력하며, 기본
   quote 실행과 `--save-db` 모드의 동작을 유지한다.
+- **Implemented**: Google Finance 전용 `StockNewsArticle`, Google News RSS Provider,
+  `GeminiStockInsightGenerator`, 불변 `StockInsight`를 추가했다.
+- **Implemented**: `analysis_application.py`가 저장된 최신 두 snapshot을 Movement Detection,
+  뉴스 조회, Gemini 요약 생성과 연결하고 `--analyze`가 그 결과를 CLI로 출력한다.
+- **Implemented**: 뉴스가 없으면 Gemini를 호출하지 않고 근거 부족 결과를 반환한다. 분석 결과는
+  이번 범위에서 JSON이나 DB에 저장하지 않는다.
 - **Proposed**: 다중 종목 순회와 Scheduler는 별도 Sprint에서 요구사항을 확인한 뒤 결정한다.
 - **Not verified**: 테스트하지 않은 시장의 DOM 차이, Google Finance selector의 장기 안정성,
   운영·상업적 사용 적합성.
-- **Not implemented**: News, LLM 분석, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
+- **Not implemented**: 분석 결과 저장, Scheduler, Excel/CSV/SQLite 저장, 내부 RPC 호출.
+
+## Analysis Application
+
+분석 흐름은 새 quote를 수집하거나 저장하지 않고 기존 snapshot을 사용한다.
+
+```text
+main.py --analyze
+    → StockQuoteStorage.get_latest_two()
+    → detect_movement()
+    → GoogleFinanceNewsProvider
+    → GeminiStockInsightGenerator
+    → StockInsight
+    → stdout
+```
+
+`StockNewsArticle`, Provider, Generator는 Google Finance 패키지 안에 있으며
+`namuwiki_trend`의 모델이나 Provider를 import하지 않는다. `StockInsight`는 symbol, 회사명,
+가격, Google Finance `change_percent`, snapshot Movement, 뉴스와 요약을 보존하는 불변 출력
+모델이다. `change_percent`는 화면이 제공한 기준 변동률이고 Movement는 두 저장 시점의
+가격 차이이므로 Prompt에서도 두 의미를 구분한다.
+
+뉴스가 0건이면 정상적인 근거 부족 상태로 처리하고 Gemini 호출을 생략한다. snapshot이
+2개 미만이면 기존 `MovementUnavailable` 계약을 유지한다. DB 오류와 뉴스·Gemini 오류는
+분석 결과로 숨기지 않고 CLI 실패로 전달한다. Gemini 요약은 공개 뉴스에 근거한 한국어
+일반 텍스트이며 최대 2문장·400자 이하로 제한한다. 인과관계를 단정하거나 투자
+권유·목표 주가·매수/매도 판단을 생성하지 않도록 요청한다.
 
 ## Movement Detection
 
@@ -87,9 +119,22 @@ main.py --show-movement
     → stdout
 ```
 
+분석 조회는 다음 별도 application 흐름을 사용한다.
+
+```text
+main.py --analyze
+    → StockQuoteStorage
+    → analyze_stored_quote()
+    → detect_movement()
+    → GoogleFinanceNewsProvider
+    → GeminiStockInsightGenerator
+    → StockInsight
+    → stdout
+```
+
 기본 quote 실행에서는 DB 설정과 Storage를 로드하지 않는다. DB 관련 import와 Session 생성은
-`--save-db` 또는 `--show-movement` 분기에서만 발생한다. 두 옵션은 서로 다른 실행 의미를
-가지므로 동시에 사용할 수 없다.
+`--save-db`, `--show-movement` 또는 `--analyze` 분기에서만 발생한다. 세 옵션은 서로 다른
+실행 의미를 가지므로 동시에 사용할 수 없다.
 
 Collector는 symbol locator로 시작한 뒤 해당 symbol의 quote container ancestor로 범위를 제한한다.
 현재가·변동률은 current quote block 안에서 읽고, 전일 종가·시가는 container 안에서 읽는다.

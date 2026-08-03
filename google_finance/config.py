@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     stock_symbols: str = "AAPL,GOOGL,MSFT"
     google_finance_locale: str = "en-US"
+    gemini_api_key: str | None = None
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(

@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from google_finance.collector import RawStockQuote
 from google_finance.main import main
-from google_finance.models import StockPrice
+from google_finance.models import StockInsight, StockNewsArticle, StockPrice
 from google_finance.movement import MovementDetectionError, MovementDirection, MovementResult
 from google_finance.movement_application import MovementUnavailable
 
@@ -43,6 +44,7 @@ class FakeSettings:
     """Minimal Settings replacement for CLI tests."""
 
     google_finance_locale = "en-US"
+    gemini_api_key = "test-key"
 
 
 class FakePipeline:
@@ -250,6 +252,92 @@ def test_main_rejects_save_db_and_show_movement_together(capsys) -> None:
     """Collection and stored movement modes are mutually exclusive."""
     with pytest.raises(SystemExit) as raised:
         main(["AAPL:NASDAQ", "--save-db", "--show-movement"])
+
+    assert raised.value.code == 2
+    assert "not allowed with argument" in capsys.readouterr().err
+
+
+def _stock_insight() -> StockInsight:
+    """Create a deterministic analysis result for CLI tests."""
+    return StockInsight(
+        symbol="AAPL:NASDAQ",
+        company_name="Apple Inc",
+        currency="USD",
+        current_price=Decimal("101.25"),
+        change_percent=Decimal("1.25"),
+        movement=_movement_result(),
+        summary="뉴스 근거를 요약했습니다.",
+        news=(StockNewsArticle(title="Apple news", url="https://news.example/apple"),),
+        generated_at=datetime(2026, 7, 30, 7, tzinfo=timezone.utc),
+    )
+
+
+def test_main_analyze_prints_insight_without_quote_collection(monkeypatch, capsys) -> None:
+    """Analysis mode delegates to the application and prints its output."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    calls: list[tuple[str, object]] = []
+
+    def fake_run_analysis(symbol: str, settings: object) -> None:
+        calls.append((symbol, settings))
+        from google_finance.main import _print_stock_insight
+
+        _print_stock_insight(_stock_insight())
+
+    monkeypatch.setattr("google_finance.main._run_analysis", fake_run_analysis)
+
+    assert main(["AAPL:NASDAQ", "--analyze"]) == 0
+
+    captured = capsys.readouterr()
+    assert calls == [("AAPL:NASDAQ", calls[0][1])]
+    assert "Summary: 뉴스 근거를 요약했습니다." in captured.out
+    assert captured.err == ""
+
+
+def test_main_analyze_reports_application_failure_on_stderr(monkeypatch, capsys) -> None:
+    """Analysis failures use the process error contract."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    monkeypatch.setattr(
+        "google_finance.main._run_analysis",
+        lambda symbol, settings: (_ for _ in ()).throw(RuntimeError("analysis unavailable")),
+    )
+
+    assert main(["AAPL:NASDAQ", "--analyze"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "analysis unavailable" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_main_does_not_print_settings_input_values(monkeypatch, capsys) -> None:
+    """Settings validation errors do not expose environment-backed input values."""
+    monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
+    validation_error = ValidationError.from_exception_data(
+        "Settings",
+        [
+            {
+                "type": "missing",
+                "loc": ("database_url",),
+                "input": {"gemini_api_key": "secret-value"},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "google_finance.main._run_analysis",
+        lambda symbol, settings: (_ for _ in ()).throw(validation_error),
+    )
+
+    assert main(["AAPL:NASDAQ", "--analyze"]) == 1
+
+    captured = capsys.readouterr()
+    assert captured.err == "[google_finance] 실행 실패: 설정 오류\n"
+    assert "secret-value" not in captured.err
+
+
+def test_main_rejects_all_collection_and_analysis_modes_together(capsys) -> None:
+    """The three modes remain mutually exclusive."""
+    with pytest.raises(SystemExit) as raised:
+        main(["AAPL:NASDAQ", "--save-db", "--analyze"])
 
     assert raised.value.code == 2
     assert "not allowed with argument" in capsys.readouterr().err

@@ -251,3 +251,24 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - 기본 quote 수집과 기존 `--save-db` 동작은 유지함
 - snapshot 부족은 정상 상태로 처리하고 exit code 0을 반환함
 - 다중 종목, Scheduler, News, LLM, threshold와 상대 변동률은 구현하지 않음
+
+## 2026-08-03 — Google Finance LLM Analysis
+
+### 구현
+
+- Google Finance 전용 뉴스 모델과 Google News RSS Provider를 추가함
+- 저장된 최신 두 snapshot의 Movement를 뉴스와 Gemini 요약에 연결하는 application 흐름을 추가함
+- 불변 `StockInsight` 출력 모델과 `--analyze` CLI 출력을 추가함
+- 뉴스가 없으면 Gemini를 호출하지 않고 근거 부족 메시지를 출력함
+- `change_percent`와 snapshot Movement를 Prompt에서 구분하고 투자 권유를 금지함
+
+### 범위와 제외
+
+- 분석 결과 JSON·DB 저장, Scheduler, 다중 종목과 공통 Provider는 구현하지 않음
+- DB와 뉴스·Gemini 오류는 fail-fast로 전달함
+
+## 2026-08-03 — Google Finance Summary Contract
+
+- Google Finance `StockInsight` 요약 계약을 최대 2문장·400자로 명확히 함
+- Generator와 Output Model이 동일한 길이 상수를 사용하도록 정리함
+- 응답을 잘라내지 않고 계약 초과는 오류로 전달함
