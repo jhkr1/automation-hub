@@ -66,6 +66,9 @@ def test_build_reason_prompt_contains_required_rules() -> None:
     assert "2026-07-29T10:00:00+00:00" in prompt
     assert "한국어 1~2문장" in prompt
     assert "추측하거나 보완하지 않는다" in prompt
+    assert "상충하는 보도" in prompt
+    assert "어느 한쪽을 사실로 단정하지 않는다" in prompt
+    assert "인기 원인" in prompt
     assert "제공된 기사만으로는 정확한 이유를 확인하기 어렵다." in prompt
     assert _article().url not in prompt
 

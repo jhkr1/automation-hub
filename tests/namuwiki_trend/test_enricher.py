@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from namuwiki_trend.enricher import TrendEnricher
+from namuwiki_trend.gemini_reason_generator import INSUFFICIENT_EVIDENCE_REASON
 from namuwiki_trend.models import NewsArticle, TrendInsight, TrendItem
 
 
@@ -79,15 +80,16 @@ def test_enrich_calls_providers_and_returns_trend_insight() -> None:
     assert reason_generator.calls == [(_trend(), news_provider.articles)]
 
 
-def test_enrich_passes_empty_articles_to_reason_generator() -> None:
-    """뉴스가 없어도 임의의 보정 없이 Generator에 빈 목록을 전달한다."""
+def test_enrich_returns_insufficient_evidence_without_calling_generator() -> None:
+    """뉴스가 없으면 근거 부족 결과를 반환하고 Generator를 호출하지 않는다."""
     news_provider = FakeNewsProvider(articles=[])
-    reason_generator = FakeReasonGenerator(reason="근거 부족")
+    reason_generator = FakeReasonGenerator()
 
     result = TrendEnricher(news_provider, reason_generator).enrich(_trend())
 
     assert result.articles == ()
-    assert reason_generator.calls[0][1] == []
+    assert result.reason == INSUFFICIENT_EVIDENCE_REASON
+    assert reason_generator.calls == []
 
 
 @pytest.mark.parametrize(

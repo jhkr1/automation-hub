@@ -2,7 +2,10 @@
 
 from typing import Protocol
 
-from namuwiki_trend.gemini_reason_generator import MAX_REASON_LENGTH
+from namuwiki_trend.gemini_reason_generator import (
+    INSUFFICIENT_EVIDENCE_REASON,
+    MAX_REASON_LENGTH,
+)
 from namuwiki_trend.models import NewsArticle, TrendInsight, TrendItem
 
 
@@ -42,7 +45,10 @@ class TrendEnricher:
             raise TypeError(f"trend가 TrendItem이 아님: {type(trend).__name__}")
 
         articles = self._news_provider.search(trend.keyword, limit=self._article_limit)
-        reason_value = self._reason_generator.generate_reason(trend, articles)
+        if articles:
+            reason_value = self._reason_generator.generate_reason(trend, articles)
+        else:
+            reason_value = INSUFFICIENT_EVIDENCE_REASON
         if not isinstance(reason_value, str):
             raise TypeError(f"reason이 문자열이 아님: {type(reason_value).__name__}")
 

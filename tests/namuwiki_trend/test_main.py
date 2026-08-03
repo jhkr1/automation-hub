@@ -115,7 +115,9 @@ def test_main_returns_zero_when_application_succeeds(monkeypatch, capsys) -> Non
     monkeypatch.setattr("namuwiki_trend.main.JsonTrendInsightStorage", lambda: object())
 
     assert main() == 0
-    assert "결과 저장 완료" in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert "결과 저장 완료" in captured.out
+    assert captured.err == ""
 
 
 def test_main_returns_one_when_application_fails(monkeypatch, capsys) -> None:
@@ -130,4 +132,6 @@ def test_main_returns_one_when_application_fails(monkeypatch, capsys) -> None:
     monkeypatch.setattr("namuwiki_trend.main.JsonTrendInsightStorage", lambda: object())
 
     assert main() == 1
-    assert "실행 실패" in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "실행 실패" in captured.err

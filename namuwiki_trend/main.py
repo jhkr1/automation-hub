@@ -1,5 +1,6 @@
 """나무위키 실시간 검색어 enrichment 전체 실행 Entry Point."""
 
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
@@ -52,7 +53,7 @@ def main() -> int:
     try:
         output_path = run_application(build_pipeline(), JsonTrendInsightStorage())
     except Exception as exc:  # noqa: BLE001 - process boundary converts failure to exit code
-        print(f"[namuwiki_trend] 실행 실패: {exc}")
+        print(f"[namuwiki_trend] 실행 실패: {exc}", file=sys.stderr)
         return 1
 
     print(f"[namuwiki_trend] 결과 저장 완료: {output_path}")
