@@ -1,77 +1,98 @@
 # google_finance
 
-Google Finance 관련 자동화를 위한 독립 패키지다.
+> Google Finance에서 주가를 수집하고 저장된 snapshot의 변동과 공개 뉴스 기반 분석을 확인하는 자동화 Package입니다.
 
-## 현재 구현 상태
+| 항목 | 내용 |
+|---|---|
+| 문서 유형 | Package Guide |
+| 대상 독자 | 실행 사용자, Junior Developer, Maintainer |
+| 예상 읽기 시간 | 5~10분 |
+| 설계 Reference | [architecture.md](architecture.md) |
 
-- **Implemented**: `config.py`의 `Settings`와 프로젝트 로거
-- **Implemented**: `models.py`의 `StockPrice`, `StockReport`
-- **Implemented**: Playwright 기반 단일 종목 Collector, 순수 추출·정규화 함수, Pipeline, CLI
-- **Implemented**: 가격과 변동률은 `Decimal`, 수집 시각은 UTC-aware datetime으로 유지
-- **Implemented**: Google Finance 전용 MySQL append-only snapshot Storage와 `--save-db` 옵션
-- **Implemented**: `--show-movement` 옵션으로 저장된 최신 두 snapshot의 변동 결과 조회
-- **Implemented**: `--analyze` 옵션으로 저장된 최신 두 snapshot과 Google News, Gemini를 연결한 CLI 분석 출력
-- **Implemented**: `STOCK_SYMBOLS` Watchlist를 순차 수집·저장·분석하는 `watchlist_main.py` CLI
-- **Implemented**: Fake 기반 단위 테스트와 `AAPL:NASDAQ` 실제 CLI 검증
-- **Not verified**: `en-US` 외 locale, 테스트하지 않은 거래소·종목의 DOM 차이, 장기적인 Google Finance selector 안정성
-- **Not implemented**: Scheduler, DB 외 저장 형식, 분석 결과 저장, threshold, 상대 변동률
+## Purpose
 
-## 다음 범위
+`google_finance`는 exchange-qualified symbol을 Playwright로 수집하고 `StockPrice`로 변환합니다. 선택적으로 MySQL snapshot을 저장하며, 저장된 최신 snapshot과 관련 Google News를 사용해 Movement와 StockInsight를 CLI에 출력합니다.
 
-현재 CLI는 다음처럼 exchange-qualified symbol 하나를 받아 화면에 표시한다.
+## Quick Start
+
+설치와 공통 검증은 [Root README](../../../README.md)를 먼저 확인합니다.
 
 ```bash
 python -m google_finance.main AAPL:NASDAQ
-python -m google_finance.main AAPL:NASDAQ --save-db
-python -m google_finance.main AAPL:NASDAQ --show-movement
-python -m google_finance.main AAPL:NASDAQ --analyze
 ```
 
-Watchlist는 `.env`의 `STOCK_SYMBOLS`를 사용한다. 쉼표로 구분한 symbol을 검증하고
-canonicalization한 뒤 입력 순서를 유지하여 순차 실행한다. 이 값은 코드에 내장된 기본 목록이
-아니라 사용자가 수정하는 설정이다.
+DB 저장 또는 저장 데이터 분석은 `DATABASE_URL`과 실행 모드에 맞는 환경을 준비해야 합니다.
 
-```env
-STOCK_SYMBOLS=NVDA:NASDAQ,PLTR:NASDAQ,005930:KRX,000660:KRX
+## Environment
+
+| 환경 변수 | 사용 흐름 | 설명 |
+|---|---|---|
+| `DATABASE_URL` | `--save-db`, `--show-movement`, `--analyze`, Watchlist | MySQL 연결 설정 |
+| `GEMINI_API_KEY` | `--analyze`, Watchlist `--analyze` | Gemini StockInsight 생성 |
+| `STOCK_SYMBOLS` | Watchlist | 쉼표로 구분한 Watchlist 입력 |
+| `GOOGLE_FINANCE_LOCALE` | Quote 수집 | 기본값은 `en-US` |
+| `LOG_LEVEL` | 로깅 | 기본값은 `INFO` |
+
+## Commands
+
+| 명령 | 동작 |
+|---|---|
+| `python -m google_finance.main AAPL:NASDAQ` | 한 종목 Quote를 수집해 출력 |
+| `python -m google_finance.main AAPL:NASDAQ --save-db` | Quote를 MySQL snapshot으로 저장 |
+| `python -m google_finance.main AAPL:NASDAQ --show-movement` | 저장된 최신 두 snapshot의 변동을 출력 |
+| `python -m google_finance.main AAPL:NASDAQ --analyze` | 저장된 변동과 Google News·Gemini 분석을 출력 |
+| `python -m google_finance.watchlist_main --collect` | `STOCK_SYMBOLS`를 순차 수집·저장 |
+| `python -m google_finance.watchlist_main --analyze` | Watchlist의 저장 snapshot을 순차 분석 |
+
+```mermaid
+flowchart TD
+    Command[CLI Command] --> Quote[Quote Collection]
+    Quote --> Save[Optional Snapshot Save]
+    Save --> Movement[Movement or Analysis]
+    Movement --> Output[CLI Output]
 ```
+
+## Current Features
+
+- Playwright 기반 단일 종목 Quote 수집과 순수 추출·정규화
+- `StockPrice`와 `StockReport` 모델
+- 가격·변동률의 `Decimal`, 수집 시각의 UTC-aware datetime 계약
+- MySQL append-only snapshot 저장과 `[newest, previous]` 조회
+- 가격 delta 기반 Movement Detection
+- Google News RSS Provider와 Gemini StockInsight 생성
+- 뉴스가 없을 때 Gemini를 호출하지 않는 근거 부족 결과
+- `STOCK_SYMBOLS` 기반 순차 Watchlist 수집·분석
+- Fake 기반 테스트, Google Finance CLI 검증과 MySQL Integration Test
+
+분석 결과는 현재 JSON이나 DB에 저장하지 않습니다.
+
+## Verification
+
+관련 테스트와 전체 검증은 다음 명령으로 실행합니다.
 
 ```bash
-python -m google_finance.watchlist_main --collect
-python -m google_finance.watchlist_main --analyze
+pytest -q tests/google_finance
+python scripts/verify.py
 ```
 
-`--collect`는 기존 단일 종목 Pipeline과 Storage를 각 symbol에 재사용한다. `--analyze`는
-기존 snapshot 조회, Movement, Google News, Gemini 분석 흐름을 각 symbol에 재사용한다.
-한 symbol의 실패가 다음 symbol을 막지는 않지만 하나라도 실패하면 종료 코드는 1이다.
-Movement에 필요한 snapshot이 부족한 경우는 정상적인 `MOVEMENT_UNAVAILABLE` 상태로 출력되고
-종료 코드는 0이다. 수집은 `DATABASE_URL`만 필요하고, 분석은 여기에 `GEMINI_API_KEY`가
-추가로 필요하다.
+MySQL Integration Test와 Live 실행은 [Operations](../../operations/README.md) 및 관련 테스트 조건을 따릅니다.
 
-Gemini 무료 계정의 일일 요청 quota가 소진되면 Watchlist는 재시도하지 않는다. 첫 quota 오류
-이후 같은 실행의 후속 Gemini 호출을 중단하고 각 종목을 `ANALYSIS_UNAVAILABLE`로 출력한다.
-가격·Movement·뉴스를 확보한 첫 종목의 일부 분석 정보는 보존하지만, 이 상태가 있으면 종료
-코드는 1이다. Batch 요청이나 분석 결과 캐시는 현재 지원하지 않는다.
+## Limitations
 
-현재 Collector와 parser는 검증된 영어 화면 계약에 따라 `en-US` locale만 허용한다.
-Google Finance의 렌더링 DOM에서 수집한 문자열은 `extraction.py`에서 검증·정규화한 뒤
-`StockPrice`로 변환한다. 내부 batchexecute/RPC 호출은 사용하지 않는다.
+- 현재 Collector와 parser는 `en-US` 화면 계약을 사용합니다.
+- 테스트하지 않은 거래소·종목의 DOM 차이와 selector의 장기 안정성은 보장하지 않습니다.
+- Scheduler, threshold, 상대 변동률, 분석 결과 저장은 현재 범위가 아닙니다.
+- 외부 Google Finance·Google News·Gemini·MySQL 상태에 따라 실행 결과가 달라질 수 있습니다.
 
-`--save-db`를 지정하면 기존 `DATABASE_URL` 설정으로 하나의 snapshot을 append한다.
-기본 실행은 기존과 같이 stdout 출력만 수행하며 DB에 쓰지 않는다. 저장 테이블은
-`stock_quote_snapshots`이고, 조회 계약은 `[newest, previous]` 순서의 최신 두 개 snapshot이다.
+## Related Documents
 
-`--show-movement`는 새로운 quote를 수집하지 않고 저장된 최신 두 snapshot을 비교한다.
-두 snapshot이 없거나 하나뿐이면 비교 불가 상태를 stdout에 표시하고 정상 종료한다.
-`DATABASE_URL`이 필요하며, `--save-db`와 동시에 사용할 수 없다. 화면의
-`change_percent`와 snapshot 사이의 movement는 서로 다른 의미이며, threshold와 상대 변동률은
-지원하지 않는다.
+- [Architecture](architecture.md): Package 구조와 설계 책임을 확인합니다.
+- [Operations](../../operations/README.md): 외부 서비스와 DB 실행 조건을 확인합니다.
+- [Root Architecture](../../architecture.md): Monorepo 전체 경계를 확인합니다.
+- [DEV_LOG](../../development/DEV_LOG.md): 구현과 검증의 시간순 기록을 확인합니다.
+- [Architecture Handbook](../../handbook/README.md): 관련 설계 판단을 학습합니다.
 
-`--analyze`도 새로운 quote를 수집하거나 저장하지 않고, 저장된 최신 두 snapshot을 비교한 뒤
-회사명으로 Google News RSS를 조회한다. 뉴스가 없으면 Gemini를 호출하지 않고 근거 부족
-메시지를 출력한다. 뉴스가 있으면 `GEMINI_API_KEY`로 `gemini-3.5-flash`를 호출해 공개 뉴스
-기반의 최대 2문장·400자 이하 요약을 출력한다. 분석 결과는 이번 범위에서 JSON이나 DB에 저장하지 않으며,
-투자 권유·목표 주가·매수/매도 판단을 생성하지 않는다.
+## Next Reading
 
-Google Finance 데이터의 지연·정확성·사용 제한과 selector 변경 위험은 별도로 검토해야 한다.
-
-상세 상태와 제안 구조는 [architecture.md](architecture.md)를 참고한다.
+- [Architecture](architecture.md): 이 Package의 책임 경계와 의존성 방향을 읽습니다.
+- [Tests](../../../tests/google_finance/): 공개 계약과 실패 경계를 확인합니다.
