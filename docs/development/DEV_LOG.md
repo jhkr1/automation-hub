@@ -272,3 +272,44 @@ HTTP API를 역공학하는 대신 브라우저 렌더링 결과를 수집하는
 - Google Finance `StockInsight` 요약 계약을 최대 2문장·400자로 명확히 함
 - Generator와 Output Model이 동일한 길이 상수를 사용하도록 정리함
 - 응답을 잘라내지 않고 계약 초과는 오류로 전달함
+
+## 2026-08-03 — Google Finance Watchlist Sprint PR 3
+
+### 구현
+
+- `STOCK_SYMBOLS` 설정을 사용하는 `watchlist_main.py` CLI를 추가함
+- `--collect`와 `--analyze`를 mutually exclusive Watchlist 실행 모드로 제공함
+- 기존 단일 종목 Pipeline, Storage, Movement, News, Gemini application 흐름을 재사용함
+- 입력 순서를 유지한 순차 실행과 종목별 안전한 결과 출력을 추가함
+- 성공·MovementUnavailable은 stdout으로, 실패는 안전한 요약과 함께 stderr로 출력함
+- 하나 이상의 종목 실패 시 종료 코드 1을 반환하고, 설정 오류는 민감정보 없이 보고함
+
+### 범위와 제외
+
+- Watchlist 종목은 코드에 하드코딩하지 않고 `STOCK_SYMBOLS` 환경변수에서 읽음
+- 수집 모드에서는 Gemini와 News를 생성하지 않고, 분석 모드에서는 브라우저 수집을 실행하지 않음
+- 병렬 실행, retry, scheduler, CLI 재설계, DB 결과 저장은 구현하지 않음
+
+### 검증
+
+- Watchlist 전용 테스트와 전체 Google Finance 테스트를 통과함
+- 전체 `verify.py`를 통과함
+- MySQL integration test는 `.env.docker`의 `DATABASE_URL`을 로드한 조건에서 통과함
+- live collect는 4개 symbol 모두 두 차례 성공함
+- live analyze는 네 symbol 모두 Gemini `ClientError`로 실패하여 StockInsight 생성까지 확인하지 못함
+
+## 2026-08-03 — Google Finance Watchlist Gemini Quota Handling
+
+### 변경
+
+- Gemini `429 RESOURCE_EXHAUSTED`와 일일 free-tier quota marker를 안전하게 분류함
+- 일일 quota 소진 시 `ANALYSIS_UNAVAILABLE / DAILY_QUOTA_EXHAUSTED` 결과를 추가함
+- 첫 quota 오류 이후 같은 `analyze_watchlist()` 실행의 후속 Gemini 호출을 중단함
+- 첫 실패 종목의 Movement와 뉴스 개수를 가능한 범위에서 보존함
+- `ANALYSIS_UNAVAILABLE`은 분석 결과가 생성되지 않았으므로 exit code 1을 유지함
+- 일시적 429와 일반 ClientError에는 retry를 추가하지 않음
+
+### 범위와 제외
+
+- Batch Gemini 요청, Insight cache, async/parallel, 유료 API 전환은 후속 최적화 범위임
+- 단일 종목 CLI, `namuwiki_trend`, Handbook은 변경하지 않음

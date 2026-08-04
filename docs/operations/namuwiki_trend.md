@@ -2,6 +2,10 @@
 
 이 문서는 현재 구현된 `namuwiki_trend`의 Docker MySQL, snapshot과 WSL cron 절차만 다룬다.
 
+현재 Production 흐름은 Google News RSS와 Gemini를 사용한다. `NAVER_CLIENT_ID`와
+`NAVER_CLIENT_SECRET`은 현재 실행 경로에서 참조되지 않는 legacy 설정이며, 운영을 위해
+가짜 값을 입력하지 않는다.
+
 ## 검증
 
 ```bash
@@ -48,10 +52,32 @@ snapshot은 `trend_snapshots`에 저장되고, Daily Trend 조회는 `collection
 ## WSL cron
 
 운영 Wrapper는 저장소 루트를 기준으로 `.venv/bin/python`을 사용하고, `.env`를 자식
-프로세스에 전달하며 `flock`으로 중복 실행을 방지한다.
+프로세스에 전달하며 `flock`으로 중복 실행을 방지한다. 기본 전체 timeout은 10분이며,
+`SIGINT`와 `SIGTERM`을 받으면 실행 중인 자식에게 같은 신호를 전달한다. timeout은
+표준 종료 코드 `124`, 신호 중단은 각각 `130`과 `143`으로 기록된다.
 
 ```bash
 ./run_namuwiki_trend.sh
+```
+
+Gemini를 호출하지 않는 Snapshot 수집은 별도 Wrapper로 실행한다.
+
+```bash
+./run_namuwiki_snapshot.sh
+```
+
+Gemini가 포함된 전체 enrichment는 Top 10 항목을 순차적으로 처리한다. RetryInfo가 있는
+일시적 `429 RESOURCE_EXHAUSTED`에는 제한적으로 재시도하지만, 일일 quota marker가 있는
+오류는 재시도하지 않고 현재 실행을 중단한다. 무료 quota를 고려해 하루 1회 실행을
+권장한다. Snapshot만 수집하는 `snapshot_main`은 2시간 주기부터 시작할 수 있다.
+
+예시:
+
+```cron
+# 저장소 경로는 실제 서버 경로로 바꾼다.
+CRON_TZ=Asia/Seoul
+17 */2 * * * /srv/automation-hub/run_namuwiki_snapshot.sh
+30 18 * * * /srv/automation-hub/run_namuwiki_trend.sh
 ```
 
 현재 cron 간격과 운영 환경은 Wrapper 및 실제 crontab 설정을 확인해야 한다. 이 문서는
