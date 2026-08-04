@@ -16,11 +16,19 @@ from automation_dashboard.queries.namuwiki import (
     load_snapshot_summary,
 )
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
+from automation_dashboard.ui.formatting import (
+    format_integer,
+    format_kst_datetime,
+)
+from automation_dashboard.ui.layout import (
+    configure_chart,
+    render_page_header,
+    render_section_header,
+    render_sidebar_context,
+)
+from automation_dashboard.ui.states import render_database_error, render_empty_state
 
-
-def _format_time(value: object) -> str:
-    """Format an already localized timestamp for stable dashboard display."""
-    return value.strftime("%Y-%m-%d %H:%M:%S %Z")
+STATISTICS_LIMIT = 20
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -51,32 +59,20 @@ def _load_snapshot_summary() -> SnapshotSummary:
         return load_snapshot_summary(session)
 
 
-def _show_database_error() -> None:
-    """Display a safe failure message without database connection details."""
-    st.error("데이터베이스 연결에 실패했습니다. Operations 로그와 DATABASE_URL 설정을 확인하세요.")
-
-
 def _latest_rows(rows: list[LatestTrendRow]) -> list[dict[str, object]]:
-    """Map persisted trend DTOs to the latest Top 10 table."""
-    return [
-        {
-            "Rank": row.rank_position,
-            "Keyword": row.keyword,
-            "Collected At (KST)": _format_time(row.collected_at),
-        }
-        for row in rows
-    ]
+    """Map persisted trend DTOs to the focused latest Top 10 table."""
+    return [{"Rank": row.rank_position, "Keyword": row.keyword} for row in rows]
 
 
 def _statistics_rows(rows: list[KeywordSummary]) -> list[dict[str, object]]:
-    """Map keyword summary DTOs to stable table values."""
+    """Map keyword summary DTOs to consistent display columns."""
     return [
         {
             "Keyword": row.keyword,
-            "Appearances": row.appearance_count,
+            "Appearances": format_integer(row.appearance_count),
             "Best Rank": row.best_rank,
-            "First Seen (KST)": _format_time(row.first_seen_at),
-            "Last Seen (KST)": _format_time(row.last_seen_at),
+            "First Seen": format_kst_datetime(row.first_seen_at),
+            "Last Seen": format_kst_datetime(row.last_seen_at),
         }
         for row in rows
     ]
@@ -84,83 +80,97 @@ def _statistics_rows(rows: list[KeywordSummary]) -> list[dict[str, object]]:
 
 def main() -> None:
     """Render the Namuwiki read-only snapshot view."""
-    st.title("Namuwiki Dashboard")
-    st.caption(
-        "저장된 Snapshot만 조회합니다. 수집·enrichment·Gemini 호출·저장 작업은 수행하지 않습니다."
-    )
-
+    render_sidebar_context()
     try:
         latest_snapshot = _load_latest_snapshot()
         summary = _load_snapshot_summary()
         statistics = _load_keyword_statistics()
     except (DashboardConfigurationError, DashboardDatabaseError):
-        _show_database_error()
+        render_page_header("Namuwiki Trends", "저장된 Top 10 Snapshot을 조회합니다.")
+        render_database_error()
         return
 
+    render_page_header(
+        "Namuwiki Trends",
+        "저장된 Top 10 Snapshot을 조회합니다. "
+        "수집·enrichment·Gemini 호출·저장 작업은 수행하지 않습니다.",
+        last_updated=summary.latest_collected_at,
+    )
     if not latest_snapshot:
-        st.info(
-            "저장된 Namuwiki Snapshot이 없습니다. "
-            "먼저 snapshot job이 정상 실행됐는지 확인하세요."
+        render_empty_state(
+            "저장된 Namuwiki Snapshot이 없습니다. 먼저 snapshot job 상태를 확인하세요."
         )
         return
 
+    rank_one_keyword = next(
+        (row.keyword for row in latest_snapshot if row.rank_position == 1),
+        latest_snapshot[0].keyword,
+    )
     overview_columns = st.columns(4)
     overview_columns[0].metric(
-        "Latest Snapshot",
-        f"{len(latest_snapshot)} rows",
-        help=f"저장된 Snapshot 묶음 수: {summary.total_snapshot_count}",
+        "Latest Batch",
+        f"{format_integer(len(latest_snapshot))} rows",
+        help=f"저장된 Snapshot 묶음 수: {format_integer(summary.total_snapshot_count)}",
     )
-    overview_columns[1].metric("Today's Snapshots", summary.today_snapshot_count)
-    overview_columns[2].metric("Stored Keywords", summary.stored_keyword_count)
-    overview_columns[3].metric(
-        "Latest Collection",
-        "-" if summary.latest_collected_at is None else _format_time(summary.latest_collected_at),
-    )
+    overview_columns[1].metric("Today's Collections", format_integer(summary.today_snapshot_count))
+    overview_columns[2].metric("Unique Keywords", format_integer(summary.stored_keyword_count))
+    overview_columns[3].metric("Latest Keyword", rank_one_keyword)
 
-    st.subheader("Latest Snapshot Top 10")
+    render_section_header("Latest Top 10", "가장 최근 저장된 순위입니다.")
     st.dataframe(
         pd.DataFrame(_latest_rows(latest_snapshot)),
         width="stretch",
         hide_index=True,
     )
-    st.caption(
-        "Snapshot 저장 스키마에는 Namuwiki 원본 링크가 포함되지 않아 링크는 표시하지 않습니다."
-    )
 
-    selected_keyword = st.selectbox(
-        "검색어 선택",
-        options=[row.keyword for row in statistics],
-    )
+    selected_keyword = st.selectbox("검색어 선택", options=[row.keyword for row in statistics])
+    selected_summary = next(row for row in statistics if row.keyword == selected_keyword)
     try:
         history = _load_keyword_history(selected_keyword)
     except (DashboardConfigurationError, DashboardDatabaseError):
-        _show_database_error()
+        render_database_error()
         return
 
-    if history:
-        st.subheader("Rank History")
+    render_section_header("Keyword Analysis", "선택한 검색어의 저장된 순위 기록입니다.")
+    analysis_columns = st.columns(4)
+    analysis_columns[0].metric("Appearances", format_integer(selected_summary.appearance_count))
+    analysis_columns[1].metric("Best Rank", selected_summary.best_rank)
+    analysis_columns[2].metric("First Seen", format_kst_datetime(selected_summary.first_seen_at))
+    analysis_columns[3].metric("Last Seen", format_kst_datetime(selected_summary.last_seen_at))
+
+    render_section_header("Rank History", "1위가 위에 표시됩니다.")
+    if len(history) < 2:
+        render_empty_state("이 검색어는 한 번만 저장되어 순위 추이를 표시할 수 없습니다.")
+    else:
         chart_frame = pd.DataFrame(
             {
-                "Collected At (KST)": [point.collected_at for point in history],
+                "Collected At": [point.collected_at for point in history],
                 "Rank": [point.rank_position for point in history],
             }
         )
         figure = px.line(
             chart_frame,
-            x="Collected At (KST)",
+            x="Collected At",
             y="Rank",
-            markers=True,
-            title=f"{selected_keyword} rank history",
+            title=f"{selected_keyword} Rank History",
         )
-        figure.update_yaxes(autorange="reversed", dtick=1, title_text="Rank")
-        st.plotly_chart(figure, width="stretch")
+        figure.update_traces(hovertemplate="Time: %{x|%Y-%m-%d %H:%M}<br>Rank: %{y}<extra></extra>")
+        figure.update_yaxes(autorange="reversed", dtick=1)
+        st.plotly_chart(
+            configure_chart(figure, x_title="Collected At (KST)", y_title="Rank"),
+            width="stretch",
+        )
 
-    st.subheader("Keyword Statistics")
+    render_section_header(
+        "Keyword Statistics",
+        f"등장 횟수, 최고 순위, 최근 등장 순서로 정렬된 상위 {STATISTICS_LIMIT}개입니다.",
+    )
     st.dataframe(
-        pd.DataFrame(_statistics_rows(statistics)),
+        pd.DataFrame(_statistics_rows(statistics[:STATISTICS_LIMIT])),
         width="stretch",
         hide_index=True,
     )
 
 
-main()
+if __name__ == "__main__":
+    main()
