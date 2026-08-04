@@ -8,9 +8,9 @@ REPO_ROOT="$SCRIPT_DIR"
 PYTHON="$REPO_ROOT/.venv/bin/python"
 export PATH="$REPO_ROOT/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 LOG_DIR="$REPO_ROOT/logs"
-LOG_FILE="$LOG_DIR/namuwiki_trend.log"
-LOCK_FILE="$LOG_DIR/namuwiki_trend.lock"
-TIMEOUT_SECONDS="${NAMUWIKI_TREND_TIMEOUT_SECONDS:-600}"
+LOG_FILE="$LOG_DIR/namuwiki_snapshot.log"
+LOCK_FILE="$LOG_DIR/namuwiki_snapshot.lock"
+TIMEOUT_SECONDS="${NAMUWIKI_SNAPSHOT_TIMEOUT_SECONDS:-600}"
 
 mkdir -p "$LOG_DIR"
 exec >>"$LOG_FILE" 2>&1
@@ -61,17 +61,17 @@ fi
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
     echo "[$(date --iso-8601=seconds)] skipped: another run is active"
-    exit 75
+    finish 75
 fi
 
 if [[ ! -x "$PYTHON" ]]; then
     echo "[$(date --iso-8601=seconds)] failed: Python not found: $PYTHON"
-    exit 78
+    finish 78
 fi
 
 if [[ ! -f "$REPO_ROOT/.env" ]]; then
     echo "[$(date --iso-8601=seconds)] failed: .env not found"
-    exit 78
+    finish 78
 fi
 
 cd "$REPO_ROOT"
@@ -84,10 +84,10 @@ if ! . "$REPO_ROOT/.env"; then
 fi
 set +a
 
-require_env GEMINI_API_KEY
+require_env DATABASE_URL
 
 timeout --signal=TERM --kill-after=30s "${TIMEOUT_SECONDS}s" \
-    "$PYTHON" -m namuwiki_trend.main &
+    "$PYTHON" -m namuwiki_trend.snapshot_main &
 child_pid="$!"
 wait "$child_pid"
 status="$?"
