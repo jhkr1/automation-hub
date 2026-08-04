@@ -53,6 +53,7 @@ Package README는 실행 방법과 현재 기능의 기준 문서입니다. Pack
 | I want to... | Start here |
 |---|---|
 | Run a package | [Package README](docs/packages/) |
+| View persisted snapshots | [Automation Dashboard](automation_dashboard/README.md) |
 | Understand the repository architecture | [Root Architecture](docs/architecture.md) |
 | Explore the code | [CODEBASE_GUIDE.md](CODEBASE_GUIDE.md) |
 | Prepare an operating environment | [Operations](docs/operations/README.md) |
