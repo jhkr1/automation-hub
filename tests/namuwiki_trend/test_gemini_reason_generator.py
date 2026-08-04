@@ -176,15 +176,28 @@ def test_generate_reason_rejects_excessively_long_response() -> None:
 
 
 def _quota_error(
-    *, retry_delay: str | None = None, status: str = "RESOURCE_EXHAUSTED"
+    *,
+    retry_delay: str | None = None,
+    status: str = "RESOURCE_EXHAUSTED",
+    daily: bool = False,
 ) -> errors.ClientError:
     """테스트용 Gemini quota 오류를 만든다."""
-    details = []
+    details: list[dict[str, object]] = []
     if retry_delay is not None:
         details.append(
             {
                 "@type": "type.googleapis.com/google.rpc.RetryInfo",
                 "retryDelay": retry_delay,
+            }
+        )
+    if daily:
+        details.append(
+            {
+                "quotaMetric": (
+                    "generativelanguage.googleapis.com/"
+                    "generate_content_free_tier_requests"
+                ),
+                "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
             }
         )
     return errors.ClientError(
@@ -253,6 +266,25 @@ def test_generate_reason_retries_only_resource_exhausted_and_uses_retry_delay() 
     assert generator.generate_reason(_trend(), []) == "재시도 성공"
     assert models.calls == 2
     assert sleeps == [3.5]
+
+
+def test_generate_reason_does_not_retry_daily_quota_exhaustion() -> None:
+    """일일 quota marker가 있으면 RetryInfo가 있어도 즉시 전달한다."""
+    error = _quota_error(retry_delay="30s", daily=True)
+    sleeps: list[float] = []
+    models = SequencedModels([error, SimpleNamespace(text="재시도되어서는 안 됨")])
+    generator = GeminiReasonGenerator(
+        client=SimpleNamespace(models=models),
+        min_request_interval_seconds=0,
+        sleeper=sleeps.append,
+    )
+
+    with pytest.raises(errors.ClientError) as raised:
+        generator.generate_reason(_trend(), [])
+
+    assert raised.value is error
+    assert models.calls == 1
+    assert sleeps == []
 
 
 def test_generate_reason_uses_bounded_exponential_retry_when_delay_missing() -> None:

@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     애플리케이션 시작 시점에 ValidationError로 즉시 실패한다.
     """
 
-    naver_client_id: str
-    naver_client_secret: str
+    naver_client_id: str | None = None
+    naver_client_secret: str | None = None
     gemini_api_key: str
     log_level: str = "INFO"
 

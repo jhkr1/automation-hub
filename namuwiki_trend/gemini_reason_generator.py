@@ -18,8 +18,22 @@ INSUFFICIENT_EVIDENCE_REASON = "제공된 기사만으로는 정확한 이유를
 DEFAULT_MIN_REQUEST_INTERVAL_SECONDS = 12.0
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+DAILY_QUOTA_MARKERS = (
+    "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+    "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+)
 Clock = Callable[[], float]
 Sleeper = Callable[[float], None]
+
+
+def is_daily_quota_exhausted(error: BaseException) -> bool:
+    """Return whether an SDK error identifies a daily request quota exhaustion."""
+    if not isinstance(error, errors.ClientError):
+        return False
+    if error.code != 429 or error.status != "RESOURCE_EXHAUSTED":
+        return False
+    details = repr(getattr(error, "details", ""))
+    return any(marker in details for marker in DAILY_QUOTA_MARKERS)
 
 
 def build_reason_prompt(trend: TrendItem, articles: list[NewsArticle]) -> str:
@@ -166,7 +180,11 @@ class GeminiReasonGenerator:
                 )
             except errors.ClientError as exc:
                 is_quota_error = exc.code == 429 and exc.status == "RESOURCE_EXHAUSTED"
-                if not is_quota_error or retry_index == self._max_retries:
+                if (
+                    not is_quota_error
+                    or is_daily_quota_exhausted(exc)
+                    or retry_index == self._max_retries
+                ):
                     raise
                 delay = self._retry_delay_seconds(exc)
                 if delay is None:
