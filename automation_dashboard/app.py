@@ -11,7 +11,10 @@ def main() -> None:
     st.set_page_config(page_title="Automation Hub Dashboard", layout="wide")
     st.title("Automation Hub Dashboard")
     st.caption("Persisted automation data only. This dashboard never runs jobs or writes data.")
-    st.info("Read-only MVP: Google Finance and Namuwiki snapshot data are available.")
+    st.info(
+        "Read-only MVP: Google Finance and Namuwiki snapshots, plus local operations status, "
+        "are available."
+    )
 
     try:
         probe_database()
@@ -24,6 +27,7 @@ def main() -> None:
     st.success("데이터베이스 연결이 확인되었습니다.")
     st.page_link("pages/1_google_finance.py", label="Google Finance Dashboard로 이동")
     st.page_link("pages/2_namuwiki.py", label="Namuwiki Dashboard로 이동")
+    st.page_link("pages/3_operations.py", label="Operations Dashboard로 이동")
 
 
 if __name__ == "__main__":
