@@ -61,6 +61,22 @@ def format_kst_datetime(value: datetime | None) -> str:
     return utc_value.astimezone(SEOUL_TZ).strftime("%Y-%m-%d %H:%M KST")
 
 
+def format_kst_date(value: datetime | None) -> str:
+    """Render a compact Seoul calendar date for metric detail text."""
+    if value is None:
+        return MISSING_VALUE
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return utc_value.astimezone(SEOUL_TZ).strftime("%Y-%m-%d")
+
+
+def format_kst_time(value: datetime | None) -> str:
+    """Render a compact Seoul clock time for a KPI value."""
+    if value is None:
+        return MISSING_VALUE
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return utc_value.astimezone(SEOUL_TZ).strftime("%H:%M")
+
+
 def format_duration(value: timedelta | None) -> str:
     """Render an elapsed duration in concise Korean display units."""
     if value is None:

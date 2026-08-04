@@ -1,5 +1,6 @@
 """Small Streamlit layout helpers shared by all dashboard pages."""
 
+from collections.abc import Sequence
 from datetime import datetime
 
 import plotly.graph_objects as go
@@ -41,6 +42,27 @@ def render_section_header(title: str, description: str | None = None) -> None:
     st.subheader(title)
     if description:
         st.caption(description)
+
+
+def render_information_card(
+    title: str,
+    *,
+    primary: tuple[str, str] | None = None,
+    details: Sequence[tuple[str, str]] = (),
+) -> None:
+    """Render long names and timestamps outside compact KPI components."""
+    with st.container(border=True):
+        st.markdown(f"**{title}**")
+        if primary is not None:
+            st.caption(primary[0])
+            st.write(primary[1])
+        if details:
+            for index in range(0, len(details), 2):
+                row_details = details[index : index + 2]
+                columns = st.columns(len(row_details))
+                for column, (label, value) in zip(columns, row_details, strict=True):
+                    column.caption(label)
+                    column.write(value)
 
 
 def render_sidebar_context() -> None:

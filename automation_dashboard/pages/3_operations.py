@@ -24,6 +24,7 @@ from automation_dashboard.ui.formatting import (
     format_repository_location,
 )
 from automation_dashboard.ui.layout import (
+    render_information_card,
     render_page_header,
     render_section_header,
     render_sidebar_context,
@@ -161,35 +162,24 @@ def main() -> None:
     if alembic.current_head is None or alembic.applied_version is None:
         render_empty_state("Migration 정보를 확인할 수 없습니다.")
     else:
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Applied Version": alembic.applied_version,
-                        "Repository Head": alembic.current_head,
-                        "Status": migration_status.label,
-                    }
-                ]
+        render_information_card(
+            "Migration Details",
+            details=(
+                ("Status", migration_status.label),
+                ("Applied Version", alembic.applied_version),
+                ("Repository Head", alembic.current_head),
             ),
-            width="stretch",
-            hide_index=True,
         )
 
     render_section_header("Runtime", "현재 Streamlit 프로세스의 로컬 실행 정보입니다.")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Item": "Python Version", "Value": runtime.python_version},
-                {"Item": "Streamlit Version", "Value": runtime.streamlit_version},
-                {"Item": "Timezone", "Value": runtime.timezone},
-                {
-                    "Item": "Working Directory",
-                    "Value": format_repository_location(runtime.working_directory),
-                },
-            ]
+    render_information_card(
+        "Runtime Details",
+        details=(
+            ("Python", runtime.python_version),
+            ("Streamlit", runtime.streamlit_version),
+            ("Timezone", runtime.timezone),
+            ("Working Directory", format_repository_location(runtime.working_directory)),
         ),
-        width="stretch",
-        hide_index=True,
     )
 
     render_section_header("Recent Activity", "가장 최근에 저장된 각 Package의 Snapshot입니다.")

@@ -11,7 +11,9 @@ from automation_dashboard.ui.formatting import (
     MISSING_VALUE,
     format_duration,
     format_file_size,
+    format_kst_date,
     format_kst_datetime,
+    format_kst_time,
     format_percent,
     format_price,
     format_repository_location,
@@ -44,6 +46,8 @@ def test_common_value_formatting_handles_kst_duration_size_and_missing_values() 
     assert format_signed_price(Decimal("1.25000000"), "USD") == "+1.25 USD"
     assert format_signed_price(Decimal("-1.25000000"), "USD") == "-1.25 USD"
     assert format_kst_datetime(datetime(2026, 8, 4, 7, 17)) == "2026-08-04 16:17 KST"
+    assert format_kst_date(datetime(2026, 8, 4, 7, 17)) == "2026-08-04"
+    assert format_kst_time(datetime(2026, 8, 4, 7, 17)) == "16:17"
     assert format_duration(timedelta(seconds=72)) == "1분 12초"
     assert format_file_size(12_800) == "12.5 KB"
     assert format_file_size(None) == MISSING_VALUE

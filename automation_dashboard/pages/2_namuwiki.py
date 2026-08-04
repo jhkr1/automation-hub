@@ -22,6 +22,7 @@ from automation_dashboard.ui.formatting import (
 )
 from automation_dashboard.ui.layout import (
     configure_chart,
+    render_information_card,
     render_page_header,
     render_section_header,
     render_sidebar_context,
@@ -69,7 +70,7 @@ def _statistics_rows(rows: list[KeywordSummary]) -> list[dict[str, object]]:
     return [
         {
             "Keyword": row.keyword,
-            "Appearances": format_integer(row.appearance_count),
+            "Appearances": row.appearance_count,
             "Best Rank": row.best_rank,
             "First Seen": format_kst_datetime(row.first_seen_at),
             "Last Seen": format_kst_datetime(row.last_seen_at),
@@ -102,10 +103,6 @@ def main() -> None:
         )
         return
 
-    rank_one_keyword = next(
-        (row.keyword for row in latest_snapshot if row.rank_position == 1),
-        latest_snapshot[0].keyword,
-    )
     overview_columns = st.columns(4)
     overview_columns[0].metric(
         "Latest Batch",
@@ -114,13 +111,17 @@ def main() -> None:
     )
     overview_columns[1].metric("Today's Collections", format_integer(summary.today_snapshot_count))
     overview_columns[2].metric("Unique Keywords", format_integer(summary.stored_keyword_count))
-    overview_columns[3].metric("Latest Keyword", rank_one_keyword)
+    overview_columns[3].metric("Stored Batches", format_integer(summary.total_snapshot_count))
 
     render_section_header("Latest Top 10", "가장 최근 저장된 순위입니다.")
     st.dataframe(
         pd.DataFrame(_latest_rows(latest_snapshot)),
         width="stretch",
         hide_index=True,
+        column_config={
+            "Rank": st.column_config.NumberColumn(width="small"),
+            "Keyword": st.column_config.TextColumn(width="large"),
+        },
     )
 
     selected_keyword = st.selectbox("검색어 선택", options=[row.keyword for row in statistics])
@@ -131,12 +132,21 @@ def main() -> None:
         render_database_error()
         return
 
+    current_rank = next(
+        (str(row.rank_position) for row in latest_snapshot if row.keyword == selected_keyword),
+        "—",
+    )
     render_section_header("Keyword Analysis", "선택한 검색어의 저장된 순위 기록입니다.")
-    analysis_columns = st.columns(4)
-    analysis_columns[0].metric("Appearances", format_integer(selected_summary.appearance_count))
-    analysis_columns[1].metric("Best Rank", selected_summary.best_rank)
-    analysis_columns[2].metric("First Seen", format_kst_datetime(selected_summary.first_seen_at))
-    analysis_columns[3].metric("Last Seen", format_kst_datetime(selected_summary.last_seen_at))
+    render_information_card(
+        "Keyword Details",
+        primary=("Keyword", selected_keyword),
+        details=(
+            ("Current Rank", current_rank),
+            ("Occurrences", format_integer(selected_summary.appearance_count)),
+            ("First Seen", format_kst_datetime(selected_summary.first_seen_at)),
+            ("Last Seen", format_kst_datetime(selected_summary.last_seen_at)),
+        ),
+    )
 
     render_section_header("Rank History", "1위가 위에 표시됩니다.")
     if len(history) < 2:
@@ -169,6 +179,13 @@ def main() -> None:
         pd.DataFrame(_statistics_rows(statistics[:STATISTICS_LIMIT])),
         width="stretch",
         hide_index=True,
+        column_config={
+            "Keyword": st.column_config.TextColumn(width="large"),
+            "Appearances": st.column_config.NumberColumn(width="small"),
+            "Best Rank": st.column_config.NumberColumn(width="small"),
+            "First Seen": st.column_config.TextColumn(width="medium"),
+            "Last Seen": st.column_config.TextColumn(width="medium"),
+        },
     )
 
 

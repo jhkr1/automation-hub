@@ -15,14 +15,16 @@ from automation_dashboard.queries.google_finance import (
 )
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
 from automation_dashboard.ui.formatting import (
-    format_integer,
+    format_kst_date,
     format_kst_datetime,
+    format_kst_time,
     format_percent,
     format_price,
     format_signed_price,
 )
 from automation_dashboard.ui.layout import (
     configure_chart,
+    render_information_card,
     render_page_header,
     render_section_header,
     render_sidebar_context,
@@ -62,7 +64,7 @@ def _quote_table_rows(quotes: list[LatestQuoteRow]) -> list[dict[str, object]]:
             "Price": format_price(quote.current_price, quote.currency),
             "Change %": format_percent(quote.change_percent),
             "Collected At": format_kst_datetime(quote.collected_at),
-            "Snapshots": format_integer(quote.snapshot_count),
+            "Snapshots": quote.snapshot_count,
         }
         for quote in quotes
     ]
@@ -113,6 +115,11 @@ def main() -> None:
         pd.DataFrame(_quote_table_rows(quotes)),
         width="stretch",
         hide_index=True,
+        column_config={
+            "Name": st.column_config.TextColumn(width="large"),
+            "Collected At": st.column_config.TextColumn(width="medium"),
+            "Snapshots": st.column_config.NumberColumn(width="small"),
+        },
     )
 
     selected_symbol = st.selectbox(
@@ -128,6 +135,11 @@ def main() -> None:
         render_database_error()
         return
 
+    render_information_card(
+        "Selected Instrument",
+        primary=("Name", selected_quote.name),
+        details=(("Symbol", selected_quote.symbol),),
+    )
     metric_columns = st.columns(4)
     metric_columns[0].metric(
         "Latest Price",
@@ -138,7 +150,12 @@ def main() -> None:
         format_signed_price(None if delta is None else delta.price_delta, selected_quote.currency),
     )
     metric_columns[2].metric("Change %", format_percent(selected_quote.change_percent))
-    metric_columns[3].metric("Last Collected", format_kst_datetime(selected_quote.collected_at))
+    metric_columns[3].metric(
+        "Last Collected",
+        format_kst_time(selected_quote.collected_at),
+        format_kst_date(selected_quote.collected_at),
+        delta_color="off",
+    )
 
     render_section_header(
         "Price History",
@@ -171,6 +188,7 @@ def main() -> None:
         pd.DataFrame(_history_table_rows(history)),
         width="stretch",
         hide_index=True,
+        column_config={"Collected At": st.column_config.TextColumn(width="medium")},
     )
 
 
