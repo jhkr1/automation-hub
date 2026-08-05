@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 from google import genai
+from google.genai import types
 from google.genai.errors import ClientError, ServerError
 
 from llm_runtime.exceptions import (
@@ -47,12 +48,12 @@ class GeminiProvider:
             if response_format is not None:
                 config["response_mime_type"] = response_format.response_mime_type
                 if response_format.response_schema is not None:
-                    config["response_schema"] = dict(response_format.response_schema)
+                    config["response_json_schema"] = dict(response_format.response_schema)
             if config:
-                kwargs["config"] = config
+                kwargs["config"] = types.GenerateContentConfig(**config)
             response = client.models.generate_content(**kwargs)
         except (ClientError, ServerError) as exc:
-            raise self._classify(exc, credential) from exc
+            raise self._classify(exc, credential, response_format) from exc
         except (TimeoutError, OSError) as exc:
             raise LlmProviderUnavailableError("gemini provider unavailable") from exc
         finally:
@@ -113,6 +114,7 @@ class GeminiProvider:
     def _classify(
         error: ClientError | ServerError,
         credential: LlmCredential,
+        response_format: LlmResponseFormat | None,
     ) -> LlmRuntimeError:
         details = repr(getattr(error, "details", ""))
         if error.code == 429 and DAILY_MARKER in details:
@@ -123,4 +125,31 @@ class GeminiProvider:
             return LlmAuthenticationError("gemini authentication or permission failed")
         if error.code >= 500:
             return LlmProviderUnavailableError("gemini provider unavailable")
-        return LlmProviderResponseError("gemini request rejected")
+        structured_output = response_format is not None
+        has_schema = (
+            response_format is not None and response_format.response_schema is not None
+        )
+        response_mime_type = (
+            response_format.response_mime_type if response_format is not None else None
+        )
+        schema_transport = "json_schema" if has_schema else None
+        schema_type = None
+        if has_schema:
+            assert response_format is not None
+            schema_type = response_format.response_schema.get("type")
+            if isinstance(schema_type, str):
+                schema_type = schema_type.lower()
+        category = {
+            400: "invalid_argument",
+            404: "not_found",
+        }.get(error.code, "client_error")
+        safe_message = (
+            "gemini request rejected: "
+            f"status={error.code} category={category} model={credential.model} "
+            f"structured_output={structured_output} "
+            f"schema_transport={schema_transport} has_schema={has_schema} "
+            f"mime_type={response_mime_type} "
+            f"schema_type={schema_type} sdk_exception={type(error).__name__}"
+        )
+        LOGGER.warning(safe_message)
+        return LlmProviderResponseError(safe_message)

@@ -2,10 +2,14 @@ import logging
 from types import SimpleNamespace
 
 import pytest
+from google import genai
+from google.genai import models as genai_models
+from google.genai import types
 from google.genai.errors import ClientError, ServerError
 
 from llm_runtime.exceptions import (
     LlmDailyQuotaExceededError,
+    LlmProviderResponseError,
     LlmProviderUnavailableError,
     LlmRateLimitError,
 )
@@ -50,6 +54,7 @@ def test_provider_converts_text_usage_and_keeps_secret_safe():
     )
     assert result.text == "answer" and result.input_tokens == 3 and result.output_tokens == 2
     assert client.models.calls[0]["model"] == "model"
+    assert "config" not in client.models.calls[0]
     assert client.close_calls == 1
 
 
@@ -141,7 +146,26 @@ def test_provider_passes_structured_output_config_to_gemini():
     client = Client(SimpleNamespace(text='{"items": []}'))
     response_format = LlmResponseFormat(
         response_mime_type="application/json",
-        response_schema={"type": "OBJECT", "required": ["items"]},
+        response_schema={
+            "type": "OBJECT",
+            "properties": {
+                "items": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "rank": {"type": "INTEGER"},
+                            "keyword": {"type": "STRING"},
+                            "reason": {"type": "STRING"},
+                        },
+                        "required": ["rank", "keyword", "reason"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["items"],
+            "additionalProperties": False,
+        },
     )
 
     GeminiProvider(lambda _: client).generate(
@@ -152,9 +176,83 @@ def test_provider_passes_structured_output_config_to_gemini():
     )
 
     config = client.models.calls[0]["config"]
-    assert config["max_output_tokens"] == 4096
-    assert config["response_mime_type"] == "application/json"
-    assert config["response_schema"] == {"type": "OBJECT", "required": ["items"]}
+    assert isinstance(config, types.GenerateContentConfig)
+    assert config.max_output_tokens == 4096
+    assert config.response_mime_type == "application/json"
+    assert config.response_schema is None
+    assert config.response_json_schema["type"] == "OBJECT"
+    assert config.response_json_schema["additionalProperties"] is False
+
+
+def test_provider_json_schema_uses_response_json_schema_in_sdk_payload():
+    client = Client(SimpleNamespace(text='{"items": []}'))
+    response_format = LlmResponseFormat(
+        response_mime_type="application/json",
+        response_schema={"type": "object", "properties": {"items": {"type": "array"}}},
+    )
+
+    GeminiProvider(lambda _: client).generate(
+        prompt="prompt",
+        credential=_credential(),
+        response_format=response_format,
+    )
+    config = client.models.calls[0]["config"]
+
+    sdk_client = genai.Client(api_key="test-only")
+    try:
+        parameters = types._GenerateContentParameters(
+            model="model",
+            contents="prompt",
+            config=config,
+        )
+        payload = genai_models._GenerateContentParameters_to_mldev(
+            sdk_client._api_client,
+            parameters,
+            None,
+            parameters,
+        )
+    finally:
+        sdk_client.close()
+
+    generation_config = payload["generationConfig"]
+    assert generation_config["responseJsonSchema"] == response_format.response_schema
+    assert "responseSchema" not in generation_config
+
+
+def test_provider_reports_safe_details_for_structured_request_rejection():
+    error = ClientError(
+        400,
+        {
+            "error": {
+                "message": "private prompt and secret should not be exposed",
+            }
+        },
+    )
+    client = Client(error)
+    response_format = LlmResponseFormat(
+        response_mime_type="application/json",
+        response_schema={"type": "OBJECT", "required": ["items"]},
+    )
+
+    with pytest.raises(LlmProviderResponseError) as raised:
+        GeminiProvider(lambda _: client).generate(
+            prompt="private prompt",
+            credential=_credential(),
+            response_format=response_format,
+        )
+
+    message = str(raised.value)
+    assert "status=400" in message
+    assert "category=invalid_argument" in message
+    assert "model=model" in message
+    assert "structured_output=True" in message
+    assert "schema_transport=json_schema" in message
+    assert "has_schema=True" in message
+    assert "mime_type=application/json" in message
+    assert "schema_type=object" in message
+    assert "sdk_exception=ClientError" in message
+    assert "private prompt" not in message
+    assert "secret" not in message
 
 
 def test_provider_closes_client_when_sdk_request_fails():
