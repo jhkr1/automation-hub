@@ -18,22 +18,33 @@ from automation_dashboard.readers.google_finance_insights import (
     read_google_finance_insights,
 )
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
+from automation_dashboard.ui.components import (
+    apply_dashboard_theme,
+    render_attention_banner,
+    render_chart_card,
+    render_empty_state,
+    render_hero_metric,
+    render_insight_card,
+    render_metadata_card,
+    render_page_hero,
+    render_section_title,
+    render_selection_panel,
+    render_table_card,
+)
 from automation_dashboard.ui.formatting import (
-    format_kst_date,
     format_kst_datetime,
-    format_kst_time,
     format_percent,
     format_price,
     format_signed_price,
 )
 from automation_dashboard.ui.layout import (
-    configure_chart,
-    render_information_card,
-    render_page_header,
-    render_section_header,
     render_sidebar_context,
 )
-from automation_dashboard.ui.states import render_database_error, render_empty_state
+from automation_dashboard.ui.states import (
+    GOOGLE_FRESHNESS_THRESHOLD,
+    freshness_state,
+    render_database_error,
+)
 
 HISTORY_LIMIT = 20
 
@@ -65,27 +76,13 @@ def _load_insights() -> GoogleFinanceInsightReadModel:
     return read_google_finance_insights()
 
 
-def _quote_table_rows(quotes: list[LatestQuoteRow]) -> list[dict[str, object]]:
-    """Map latest quote DTOs to concise UI columns without exposing ORM objects."""
-    return [
-        {
-            "Symbol": quote.symbol,
-            "Name": quote.name,
-            "Price": format_price(quote.current_price, quote.currency),
-            "Change %": format_percent(quote.change_percent),
-            "Collected At": format_kst_datetime(quote.collected_at),
-            "Snapshots": quote.snapshot_count,
-        }
-        for quote in quotes
-    ]
-
-
 def _history_table_rows(history: list[PricePoint]) -> list[dict[str, object]]:
     """Map oldest-to-newest chart data to a separate latest-first table contract."""
     return [
         {
             "Collected At": format_kst_datetime(point.collected_at),
             "Price": format_price(point.current_price, point.currency),
+            "Currency": point.currency,
             "Change %": format_percent(point.change_percent),
         }
         for point in reversed(history)
@@ -100,54 +97,137 @@ def _selected_label(symbol: str, quotes: list[LatestQuoteRow]) -> str:
 
 def _render_insights(model: GoogleFinanceInsightReadModel) -> None:
     """Render the future insight contract without fabricating analysis data."""
-    render_section_header(
-        "LLM Stock Insights",
-        "Google Finance 분석 artifact가 준비되면 연결할 read-only 영역입니다.",
+    render_insight_card(
+        status=model.status.value,
+        headline="LLM Stock Insight",
+        summary=model.message,
     )
-    st.metric("Status", model.status.value)
-    render_empty_state(model.message)
+
+
+def _render_price_hero(
+    quote: LatestQuoteRow,
+    delta: SnapshotDelta | None,
+) -> None:
+    """Render the selected symbol's primary price and status context."""
+    movement = (
+        "Available"
+        if delta is not None
+        else "Movement Unavailable"
+    )
+    data_state = freshness_state(
+        quote.collected_at,
+        threshold=GOOGLE_FRESHNESS_THRESHOLD,
+    )
+    price_delta = None if delta is None else format_signed_price(delta.price_delta, quote.currency)
+    price_columns = st.columns([2, 1])
+    with price_columns[0]:
+        render_hero_metric(
+            "Current Price",
+            format_price(quote.current_price, quote.currency),
+            detail=f"{quote.name} · {quote.symbol}",
+            delta=price_delta,
+        )
+    with price_columns[1]:
+        render_metadata_card(
+            "Status Context",
+            {
+                "Data Status": data_state.label,
+                "Change %": format_percent(quote.change_percent),
+                "Last Collected": format_kst_datetime(quote.collected_at),
+                "Movement": movement,
+            },
+        )
+    if data_state.label in {"Stale", "No Data"}:
+        render_attention_banner(
+            "Google Finance",
+            f"데이터 상태가 {data_state.label}입니다.",
+            status=data_state.label,
+        )
+    elif delta is None:
+        render_attention_banner(
+            "Movement",
+            "직전 Snapshot이 없어 변화량을 계산할 수 없습니다.",
+            status="Movement Unavailable",
+        )
+
+
+def _render_price_chart(
+    selected_symbol: str,
+    selected_quote: LatestQuoteRow,
+    history: list[PricePoint],
+) -> None:
+    """Render price history without smoothing, forecasting, or invented data."""
+    if len(history) < 2:
+        render_empty_state(
+            "가격 추이를 표시하려면 선택 종목의 Snapshot이 두 개 이상 필요합니다."
+        )
+        return
+    chart_frame = pd.DataFrame(
+        {
+            "Collected At": [point.collected_at for point in history],
+            "Price": [float(point.current_price) for point in history],
+        }
+    )
+    figure = px.line(chart_frame, x="Collected At", y="Price")
+    figure.update_traces(
+        hovertemplate="Time: %{x|%Y-%m-%d %H:%M KST}<br>Price: %{y}<extra></extra>"
+    )
+    render_chart_card(
+        f"{selected_symbol} Price History ({selected_quote.currency})",
+        figure,
+        x_title="Collected At (KST)",
+        y_title=selected_quote.currency,
+        interpretation="저장된 가격 Snapshot을 오래된 순서로 표시합니다.",
+    )
 
 
 def main() -> None:
     """Render the Google Finance read-only snapshot view."""
+    apply_dashboard_theme()
     render_sidebar_context()
     try:
         quotes = _load_latest_quotes()
     except (DashboardConfigurationError, DashboardDatabaseError):
-        render_page_header("Google Finance", "저장된 가격 Snapshot을 조회합니다.")
+        render_page_hero(
+            "Google Finance",
+            "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+            status="Unavailable",
+        )
         render_database_error()
         return
 
-    latest_collected_at = max((quote.collected_at for quote in quotes), default=None)
-    render_page_header(
-        "Google Finance",
-        "저장된 가격 Snapshot을 조회합니다. 수집·분석·저장 작업은 수행하지 않습니다.",
-        last_updated=latest_collected_at,
-    )
-    _render_insights(_load_insights())
     if not quotes:
+        render_page_hero(
+            "Google Finance",
+            "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+            status="No Data",
+        )
         render_empty_state(
             "저장된 Google Finance Snapshot이 없습니다. 먼저 collect job 상태를 확인하세요."
         )
         return
 
-    render_section_header("Latest Quotes", "종목별 최신 저장 가격입니다.")
-    st.dataframe(
-        pd.DataFrame(_quote_table_rows(quotes)),
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "Name": st.column_config.TextColumn(width="large"),
-            "Collected At": st.column_config.TextColumn(width="medium"),
-            "Snapshots": st.column_config.NumberColumn(width="small"),
-        },
+    default_quote = max(quotes, key=lambda quote: quote.collected_at)
+    default_state = freshness_state(
+        default_quote.collected_at,
+        threshold=GOOGLE_FRESHNESS_THRESHOLD,
     )
-
-    selected_symbol = st.selectbox(
-        "종목 선택",
-        options=[quote.symbol for quote in quotes],
+    render_page_hero(
+        "Google Finance",
+        "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+        primary_entity=f"{default_quote.name} ({default_quote.symbol})",
+        status=default_state.label,
+        last_updated=default_quote.collected_at,
+    )
+    selected_symbol = render_selection_panel(
+        "Select symbol",
+        [quote.symbol for quote in quotes],
+        default_index=next(index for index, quote in enumerate(quotes) if quote == default_quote),
         format_func=lambda symbol: _selected_label(symbol, quotes),
     )
+    if selected_symbol is None:
+        render_empty_state("선택 가능한 종목이 없습니다.")
+        return
     selected_quote = next(quote for quote in quotes if quote.symbol == selected_symbol)
     try:
         delta = _load_latest_delta(selected_symbol)
@@ -156,60 +236,37 @@ def main() -> None:
         render_database_error()
         return
 
-    render_information_card(
+    render_section_title("Primary Price", "선택한 종목의 최신 저장 가격입니다.")
+    _render_price_hero(selected_quote, delta)
+
+    render_section_title("Price Visualization")
+    _render_price_chart(selected_symbol, selected_quote, history)
+
+    render_section_title("AI Insight")
+    _render_insights(_load_insights())
+
+    render_section_title("Snapshot History", "최신 수집 시각부터 표시합니다.")
+    history_frame = pd.DataFrame(_history_table_rows(history))
+    render_table_card(
+        "History",
+        history_frame,
+        description="가격과 변화율은 저장된 Snapshot 값입니다.",
+    )
+
+    first_collected = history[-1].collected_at if history else selected_quote.collected_at
+    render_section_title("Metadata")
+    render_metadata_card(
         "Selected Instrument",
-        primary=("Name", selected_quote.name),
-        details=(("Symbol", selected_quote.symbol),),
-    )
-    metric_columns = st.columns(4)
-    metric_columns[0].metric(
-        "Latest Price",
-        format_price(selected_quote.current_price, selected_quote.currency),
-    )
-    metric_columns[1].metric(
-        "Price Delta",
-        format_signed_price(None if delta is None else delta.price_delta, selected_quote.currency),
-    )
-    metric_columns[2].metric("Change %", format_percent(selected_quote.change_percent))
-    metric_columns[3].metric(
-        "Last Collected",
-        format_kst_time(selected_quote.collected_at),
-        format_kst_date(selected_quote.collected_at),
-        delta_color="off",
-    )
-
-    render_section_header(
-        "Price History",
-        "차트는 오래된 순서이고, 아래 표는 최근 수집 시각부터 표시합니다.",
-    )
-    if len(history) < 2:
-        render_empty_state("가격 추이를 표시하려면 선택 종목의 Snapshot이 두 개 이상 필요합니다.")
-    else:
-        chart_frame = pd.DataFrame(
-            {
-                "Collected At": [point.collected_at for point in history],
-                "Price": [float(point.current_price) for point in history],
-            }
-        )
-        figure = px.line(
-            chart_frame,
-            x="Collected At",
-            y="Price",
-            title=f"{selected_symbol} Price History ({selected_quote.currency})",
-        )
-        figure.update_traces(
-            hovertemplate="Time: %{x|%Y-%m-%d %H:%M}<br>Price: %{y}<extra></extra>"
-        )
-        st.plotly_chart(
-            configure_chart(figure, x_title="Collected At (KST)", y_title=selected_quote.currency),
-            width="stretch",
-        )
-
-    st.dataframe(
-        pd.DataFrame(_history_table_rows(history)),
-        width="stretch",
-        hide_index=True,
-        column_config={"Collected At": st.column_config.TextColumn(width="medium")},
+        {
+            "Symbol": selected_quote.symbol,
+            "Instrument": selected_quote.name,
+            "Currency": selected_quote.currency,
+            "Snapshot Count": str(selected_quote.snapshot_count),
+            "First Collected": format_kst_datetime(first_collected),
+            "Last Collected": format_kst_datetime(selected_quote.collected_at),
+            "Movement": "Available" if delta is not None else "Unavailable",
+            "Source": "Google Finance Snapshot",
+        },
     )
 
 

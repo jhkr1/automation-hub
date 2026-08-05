@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from automation_dashboard.ui.formatting import format_kst_datetime
+from automation_dashboard.ui.tokens import TOKENS
 
 CACHE_TTL_SECONDS = 60
 
@@ -14,7 +15,7 @@ CACHE_TTL_SECONDS = 60
 def configure_chart(figure: go.Figure, *, x_title: str, y_title: str) -> go.Figure:
     """Apply a restrained Plotly layout that keeps Streamlit themes intact."""
     figure.update_layout(
-        height=360,
+        height=TOKENS.chart_height,
         hovermode="x unified",
         margin={"l": 20, "r": 20, "t": 56, "b": 20},
         showlegend=False,
