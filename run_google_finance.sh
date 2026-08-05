@@ -50,11 +50,23 @@ forward_signal() {
 trap 'forward_signal TERM 143' TERM
 trap 'forward_signal INT 130' INT
 
-if [[ "$#" -ne 1 || ( "$1" != "--collect" && "$1" != "--analyze" ) ]]; then
-    echo "usage: $0 --collect|--analyze" >&2
+if [[ "$#" -ne 1 && "$#" -ne 3 ]] || [[ "$1" != "--collect" && "$1" != "--analyze" ]]; then
+    echo "usage: $0 --collect|--analyze [--key-profile production|test]" >&2
     finish 2
 fi
 mode="$1"
+key_profile=""
+if [[ "$#" -eq 3 ]]; then
+    if [[ "$2" != "--key-profile" || ( "$3" != "production" && "$3" != "test" ) ]]; then
+        echo "usage: $0 --collect|--analyze [--key-profile production|test]" >&2
+        finish 2
+    fi
+    key_profile="$3"
+fi
+if [[ "$mode" == "--collect" && -n "$key_profile" ]]; then
+    echo "--key-profile is only valid with --analyze" >&2
+    finish 2
+fi
 
 start_time="$(date --iso-8601=seconds)"
 echo "[$start_time] start mode=$mode"
@@ -93,11 +105,26 @@ set +a
 if [[ "$mode" == "--collect" ]]; then
     require_env DATABASE_URL STOCK_SYMBOLS
 else
-    require_env DATABASE_URL STOCK_SYMBOLS GEMINI_API_KEY
+    if [[ -z "$key_profile" ]]; then
+        echo "--analyze requires --key-profile production|test" >&2
+        finish 2
+    fi
+    export APP_ENV="$key_profile"
+    if [[ "$key_profile" == "production" ]]; then
+        require_env DATABASE_URL STOCK_SYMBOLS GEMINI_GOOGLE_FINANCE_API_KEY_PROD
+    else
+        require_env DATABASE_URL STOCK_SYMBOLS GEMINI_GOOGLE_FINANCE_API_KEY_TEST
+    fi
 fi
 
-timeout --signal=TERM --kill-after=30s "${TIMEOUT_SECONDS}s" \
-    "$PYTHON" -m google_finance.watchlist_main "$mode" &
+if [[ -n "$key_profile" ]]; then
+    timeout --signal=TERM --kill-after=30s "${TIMEOUT_SECONDS}s" \
+        "$PYTHON" -m google_finance.watchlist_main "$mode" \
+        --key-profile "$key_profile" &
+else
+    timeout --signal=TERM --kill-after=30s "${TIMEOUT_SECONDS}s" \
+        "$PYTHON" -m google_finance.watchlist_main "$mode" &
+fi
 child_pid="$!"
 wait "$child_pid"
 status="$?"

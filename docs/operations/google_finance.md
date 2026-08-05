@@ -17,11 +17,17 @@
 
 ```bash
 ./run_google_finance.sh --collect
-./run_google_finance.sh --analyze
+./run_google_finance.sh --analyze --key-profile production
+./run_google_finance.sh --analyze --key-profile test
 ```
 
 timeout은 필요하면 실행 환경에서 `GOOGLE_FINANCE_TIMEOUT_SECONDS`로 조정할 수 있다.
 기본값은 600초이며, 이 값은 `.env`에 기록하지 않고 Wrapper 실행 환경에서만 설정한다.
+
+분석은 `production` 또는 `test` profile을 명시해야 한다. 선택한 profile 이름만 Python
+entrypoint로 전달하며, credential 선택·quota reservation·retry는 `LlmRuntime`이 담당한다.
+해당 Google Finance key만 검사하며 다른 job/profile key로 fallback하지 않는다. `--collect`는
+Gemini를 사용하지 않으며 cron은 production profile만 사용한다.
 
 ## Cron 권장 예시
 
@@ -34,13 +40,14 @@ Gemini 호출을 발생시킬 수 있으므로 무료 quota를 고려해 하루 
 7 * * * * /srv/automation-hub/run_google_finance.sh --collect
 
 # quota reset 이후 여유를 두고 하루 한 번 저장된 Snapshot을 분석한다.
-10 18 * * * /srv/automation-hub/run_google_finance.sh --analyze
+10 18 * * * /srv/automation-hub/run_google_finance.sh --analyze --key-profile production
 ```
 
 첫 분석 시점에 동일 종목의 Snapshot이 두 개 미만이면 `MOVEMENT_UNAVAILABLE`이
 정상적으로 반환된다. Gemini 무료 quota가 20 requests/day인 환경에서는 다른 Gemini
 사용량과 Namuwiki 실행을 합산해야 하며, quota가 확정되기 전에는 분석 주기를 늘리지
-않는다.
+않는다. 분석 결과는 현재 CLI 출력만 제공하며 JSON 저장과 Dashboard 표시는 후속 Sprint
+범위다. cron 등록 전에는 `test` profile로 수동 smoke test를 수행한다.
 
 ## 로그
 
@@ -74,7 +81,7 @@ Wrapper는 stdout과 stderr를 `google_finance_wrapper.log`로 모으고 `.env` 
 ## 운영 체크리스트
 
 - [ ] `STOCK_SYMBOLS`가 실제 서버 환경에 설정되어 있다.
-- [ ] `GEMINI_API_KEY`는 `--analyze` 실행 환경에만 전달된다.
+- [ ] 선택한 profile의 Google Finance key가 `--analyze` 실행 환경에 존재한다.
 - [ ] `--collect`를 수동 실행해 DB Snapshot 저장을 확인했다.
 - [ ] Snapshot이 두 개 이상 쌓인 뒤 `--analyze`를 수동 실행했다.
 - [ ] 두 Wrapper를 동시에 실행해 한 번만 수행되는지 확인했다.

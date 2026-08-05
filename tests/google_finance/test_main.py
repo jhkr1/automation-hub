@@ -277,7 +277,7 @@ def test_main_analyze_prints_insight_without_quote_collection(monkeypatch, capsy
     monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
     calls: list[tuple[str, object]] = []
 
-    def fake_run_analysis(symbol: str, settings: object) -> None:
+    def fake_run_analysis(symbol: str, settings: object, profile: object) -> None:
         calls.append((symbol, settings))
         from google_finance.main import _print_stock_insight
 
@@ -285,7 +285,7 @@ def test_main_analyze_prints_insight_without_quote_collection(monkeypatch, capsy
 
     monkeypatch.setattr("google_finance.main._run_analysis", fake_run_analysis)
 
-    assert main(["AAPL:NASDAQ", "--analyze"]) == 0
+    assert main(["AAPL:NASDAQ", "--analyze", "--key-profile", "test"]) == 0
 
     captured = capsys.readouterr()
     assert calls == [("AAPL:NASDAQ", calls[0][1])]
@@ -298,15 +298,23 @@ def test_main_analyze_reports_application_failure_on_stderr(monkeypatch, capsys)
     monkeypatch.setattr("google_finance.main.Settings", FakeSettings)
     monkeypatch.setattr(
         "google_finance.main._run_analysis",
-        lambda symbol, settings: (_ for _ in ()).throw(RuntimeError("analysis unavailable")),
+        lambda symbol, settings, profile: (_ for _ in ()).throw(
+            RuntimeError("analysis unavailable")
+        ),
     )
 
-    assert main(["AAPL:NASDAQ", "--analyze"]) == 1
+    assert main(["AAPL:NASDAQ", "--analyze", "--key-profile", "test"]) == 1
 
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "analysis unavailable" in captured.err
     assert "Traceback" not in captured.err
+
+
+def test_main_analyze_requires_profile() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["AAPL:NASDAQ", "--analyze"])
+    assert raised.value.code == 2
 
 
 def test_main_does_not_print_settings_input_values(monkeypatch, capsys) -> None:
@@ -324,10 +332,10 @@ def test_main_does_not_print_settings_input_values(monkeypatch, capsys) -> None:
     )
     monkeypatch.setattr(
         "google_finance.main._run_analysis",
-        lambda symbol, settings: (_ for _ in ()).throw(validation_error),
+        lambda symbol, settings, profile: (_ for _ in ()).throw(validation_error),
     )
 
-    assert main(["AAPL:NASDAQ", "--analyze"]) == 1
+    assert main(["AAPL:NASDAQ", "--analyze", "--key-profile", "test"]) == 1
 
     captured = capsys.readouterr()
     assert captured.err == "[google_finance] 실행 실패: 설정 오류\n"

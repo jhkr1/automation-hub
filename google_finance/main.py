@@ -3,6 +3,7 @@
 import argparse
 import sys
 from decimal import Decimal
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -11,6 +12,10 @@ from google_finance.config import Settings
 from google_finance.models import StockInsight, StockPrice
 from google_finance.movement import MovementResult
 from google_finance.pipeline import StockPricePipeline
+from llm_runtime.models import KeyProfile
+from llm_runtime.providers.gemini import GeminiProvider
+from llm_runtime.quota import LocalFileQuotaLedger
+from llm_runtime.runtime import LlmRuntime
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -32,6 +37,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--analyze",
         action="store_true",
         help="analyze movement between the latest stored snapshots with related news",
+    )
+    parser.add_argument(
+        "--key-profile",
+        choices=(KeyProfile.PRODUCTION.value, KeyProfile.TEST.value),
+        help="credential profile for --analyze",
     )
     return parser
 
@@ -90,7 +100,18 @@ def _print_stock_insight(insight: StockInsight) -> None:
     print(f"Summary: {insight.summary}")
 
 
-def _run_analysis(symbol: str, settings: Settings) -> None:
+def build_llm_runtime() -> LlmRuntime:
+    """Compose the shared Gemini Provider and project-level quota ledger."""
+    repository_root = Path(__file__).resolve().parents[1]
+    return LlmRuntime(
+        provider=GeminiProvider(),
+        ledger=LocalFileQuotaLedger(
+            repository_root / ".state" / "llm" / "quota-ledger.json"
+        ),
+    )
+
+
+def _run_analysis(symbol: str, settings: Settings, profile: KeyProfile) -> None:
     """Analyze stored movement without collecting or saving a new quote."""
     from google_finance.analysis_application import analyze_stored_quote
     from google_finance.analysis_generator import GeminiStockInsightGenerator
@@ -101,7 +122,7 @@ def _run_analysis(symbol: str, settings: Settings) -> None:
     result = analyze_stored_quote(
         StockQuoteStorage(),
         GoogleFinanceNewsProvider(),
-        GeminiStockInsightGenerator(api_key=settings.gemini_api_key),
+        GeminiStockInsightGenerator(runtime=build_llm_runtime(), profile=profile),
         symbol,
     )
     if isinstance(result, StockInsight):
@@ -129,7 +150,12 @@ def _run_movement(symbol: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """Collect one quote and return a process exit code."""
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.analyze and args.key_profile is None:
+        parser.error("--analyze requires --key-profile production|test")
+    if not args.analyze and args.key_profile is not None:
+        parser.error("--key-profile is only valid with --analyze")
     try:
         if args.show_movement:
             _run_movement(args.symbol)
@@ -137,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
 
         settings = Settings()
         if args.analyze:
-            _run_analysis(args.symbol, settings)
+            _run_analysis(args.symbol, settings, KeyProfile(args.key_profile))
             return 0
         stock_price = build_pipeline(settings).run(args.symbol)
         _print_stock_price(stock_price)

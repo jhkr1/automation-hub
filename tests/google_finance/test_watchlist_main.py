@@ -83,6 +83,23 @@ def test_parser_requires_exactly_one_mode() -> None:
         watchlist_main._build_parser().parse_args(["--collect", "--analyze"])
     assert both_modes.value.code == 2
 
+    with pytest.raises(SystemExit) as invalid_profile:
+        watchlist_main._build_parser().parse_args(
+            ["--analyze", "--key-profile", "invalid"]
+        )
+    assert invalid_profile.value.code == 2
+
+
+def test_analyze_requires_profile_and_collect_rejects_profile(monkeypatch) -> None:
+    monkeypatch.setattr(watchlist_main, "Settings", FakeSettings)
+    with pytest.raises(SystemExit) as missing_profile:
+        watchlist_main.main(["--analyze"])
+    assert missing_profile.value.code == 2
+
+    with pytest.raises(SystemExit) as collect_profile:
+        watchlist_main.main(["--collect", "--key-profile", "test"])
+    assert collect_profile.value.code == 2
+
 
 def test_collect_prints_success_to_stdout_and_returns_zero(monkeypatch, capsys) -> None:
     monkeypatch.setattr(watchlist_main, "Settings", FakeSettings)
@@ -143,7 +160,7 @@ def test_analyze_success_prints_contract_to_stdout(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         watchlist_main,
         "_run_analyze",
-        lambda settings, symbols: [
+        lambda settings, symbols, profile: [
             WatchlistAnalysisResult(
                 symbol="NVDA:NASDAQ",
                 status=WatchlistAnalysisStatus.SUCCESS,
@@ -152,7 +169,7 @@ def test_analyze_success_prints_contract_to_stdout(monkeypatch, capsys) -> None:
         ],
     )
 
-    assert watchlist_main.main(["--analyze"]) == 0
+    assert watchlist_main.main(["--analyze", "--key-profile", "test"]) == 0
     output = capsys.readouterr()
     assert "Company: Company NVDA:NASDAQ" in output.out
     assert "Movement: UP" in output.out
@@ -168,7 +185,7 @@ def test_analyze_movement_unavailable_is_normal_stdout_result(monkeypatch, capsy
     monkeypatch.setattr(
         watchlist_main,
         "_run_analyze",
-        lambda settings, symbols: [
+        lambda settings, symbols, profile: [
             WatchlistAnalysisResult(
                 symbol="NVDA:NASDAQ",
                 status=WatchlistAnalysisStatus.MOVEMENT_UNAVAILABLE,
@@ -177,7 +194,7 @@ def test_analyze_movement_unavailable_is_normal_stdout_result(monkeypatch, capsy
         ],
     )
 
-    assert watchlist_main.main(["--analyze"]) == 0
+    assert watchlist_main.main(["--analyze", "--key-profile", "test"]) == 0
     output = capsys.readouterr()
     assert "Status: MOVEMENT_UNAVAILABLE" in output.out
     assert "Snapshot count: 1" in output.out
@@ -189,7 +206,7 @@ def test_analyze_quota_unavailable_is_stdout_but_returns_nonzero(monkeypatch, ca
     monkeypatch.setattr(
         watchlist_main,
         "_run_analyze",
-        lambda settings, symbols: [
+        lambda settings, symbols, profile: [
             WatchlistAnalysisResult(
                 symbol="NVDA:NASDAQ",
                 status=WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE,
@@ -205,7 +222,7 @@ def test_analyze_quota_unavailable_is_stdout_but_returns_nonzero(monkeypatch, ca
         ],
     )
 
-    assert watchlist_main.main(["--analyze"]) == 1
+    assert watchlist_main.main(["--analyze", "--key-profile", "test"]) == 1
     output = capsys.readouterr()
     assert output.out.count("Status: ANALYSIS_UNAVAILABLE") == 2
     assert "Reason: DAILY_QUOTA_EXHAUSTED" in output.out
@@ -222,9 +239,13 @@ def test_analyze_failure_uses_stderr_and_nonzero_exit(monkeypatch, capsys) -> No
         error_stage=WatchlistAnalysisErrorStage.ANALYSIS,
         error_message="ANALYSIS failed: RuntimeError",
     )
-    monkeypatch.setattr(watchlist_main, "_run_analyze", lambda settings, symbols: [failure])
+    monkeypatch.setattr(
+        watchlist_main,
+        "_run_analyze",
+        lambda settings, symbols, profile: [failure],
+    )
 
-    assert watchlist_main.main(["--analyze"]) == 1
+    assert watchlist_main.main(["--analyze", "--key-profile", "test"]) == 1
     output = capsys.readouterr()
     assert "Status: FAILED" in output.err
     assert "ANALYSIS failed: RuntimeError" in output.err

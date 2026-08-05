@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -19,6 +20,10 @@ from google_finance.watchlist_application import (
     analyze_watchlist,
     collect_watchlist,
 )
+from llm_runtime.models import KeyProfile
+from llm_runtime.providers.gemini import GeminiProvider
+from llm_runtime.quota import LocalFileQuotaLedger
+from llm_runtime.runtime import LlmRuntime
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -27,6 +32,11 @@ def _build_parser() -> argparse.ArgumentParser:
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--collect", action="store_true", help="collect and save all symbols")
     modes.add_argument("--analyze", action="store_true", help="analyze stored snapshots")
+    parser.add_argument(
+        "--key-profile",
+        choices=(KeyProfile.PRODUCTION.value, KeyProfile.TEST.value),
+        help="credential profile for --analyze",
+    )
     return parser
 
 
@@ -48,11 +58,23 @@ def _run_collect(settings: Settings, symbols: Sequence[str]) -> list[WatchlistCo
     return collect_watchlist(symbols, pipeline.run, storage.save)
 
 
-def _run_analyze(settings: Settings, symbols: Sequence[str]) -> list[WatchlistAnalysisResult]:
-    """Compose existing storage, news, generator, and analysis application APIs."""
-    if not settings.gemini_api_key:
-        raise ValueError("GEMINI_API_KEY is required for --analyze")
+def build_llm_runtime() -> LlmRuntime:
+    """Compose the shared Gemini Provider and project-level quota ledger."""
+    repository_root = Path(__file__).resolve().parents[1]
+    return LlmRuntime(
+        provider=GeminiProvider(),
+        ledger=LocalFileQuotaLedger(
+            repository_root / ".state" / "llm" / "quota-ledger.json"
+        ),
+    )
 
+
+def _run_analyze(
+    settings: Settings,
+    symbols: Sequence[str],
+    profile: KeyProfile,
+) -> list[WatchlistAnalysisResult]:
+    """Compose existing storage, news, generator, and analysis application APIs."""
     from google_finance.analysis_application import analyze_stored_quote
     from google_finance.analysis_generator import GeminiStockInsightGenerator
     from google_finance.news import GoogleFinanceNewsProvider
@@ -60,7 +82,10 @@ def _run_analyze(settings: Settings, symbols: Sequence[str]) -> list[WatchlistAn
 
     storage = StockQuoteStorage()
     provider = GoogleFinanceNewsProvider()
-    generator = GeminiStockInsightGenerator(api_key=settings.gemini_api_key)
+    generator = GeminiStockInsightGenerator(
+        runtime=build_llm_runtime(),
+        profile=profile,
+    )
 
     def analyze_one(symbol: str) -> StockInsight | MovementUnavailable:
         return analyze_stored_quote(storage, provider, generator, symbol)
@@ -151,6 +176,10 @@ def _print_settings_error() -> None:
 def main(argv: list[str] | None = None) -> int:
     """Run the selected Watchlist mode and return its process exit code."""
     args = _build_parser().parse_args(argv)
+    if args.collect and args.key_profile is not None:
+        _build_parser().error("--key-profile is only valid with --analyze")
+    if args.analyze and args.key_profile is None:
+        _build_parser().error("--analyze requires --key-profile production|test")
     try:
         settings = Settings()
         symbols = settings.get_symbol_list()
@@ -164,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
                 else 0
             )
 
-        results = _run_analyze(settings, symbols)
+        results = _run_analyze(settings, symbols, KeyProfile(args.key_profile))
         for result in results:
             _print_analysis_result(result)
         return (

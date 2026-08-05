@@ -3,15 +3,13 @@
 from datetime import datetime, timezone
 from typing import Protocol
 
-from google_finance.analysis_generator import (
-    INSUFFICIENT_EVIDENCE_REASON,
-    GeminiDailyQuotaExhaustedError,
-)
+from google_finance.analysis_generator import INSUFFICIENT_EVIDENCE_REASON
 from google_finance.collector import validate_symbol
 from google_finance.models import StockInsight, StockNewsArticle, StockPrice
 from google_finance.movement import MovementResult, detect_movement
 from google_finance.movement_application import MovementUnavailable
 from google_finance.storage import StockQuoteStorage
+from llm_runtime.exceptions import LlmDailyQuotaExceededError
 
 
 class StockNewsProvider(Protocol):
@@ -63,7 +61,7 @@ def analyze_stored_quote(
     if articles:
         try:
             summary = generator.generate_summary(latest, movement, articles)
-        except GeminiDailyQuotaExhaustedError as exc:
+        except LlmDailyQuotaExceededError as exc:
             raise GeminiAnalysisUnavailableError(movement, len(articles)) from exc
     else:
         summary = INSUFFICIENT_EVIDENCE_REASON

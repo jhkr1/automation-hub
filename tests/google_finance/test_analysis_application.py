@@ -10,10 +10,7 @@ from google_finance.analysis_application import (
     GeminiAnalysisUnavailableError,
     analyze_stored_quote,
 )
-from google_finance.analysis_generator import (
-    INSUFFICIENT_EVIDENCE_REASON,
-    GeminiDailyQuotaExhaustedError,
-)
+from google_finance.analysis_generator import INSUFFICIENT_EVIDENCE_REASON
 from google_finance.models import (
     MAX_STOCK_INSIGHT_SUMMARY_LENGTH,
     StockInsight,
@@ -22,6 +19,7 @@ from google_finance.models import (
 )
 from google_finance.movement import MovementDirection, MovementResult
 from google_finance.movement_application import MovementUnavailable
+from llm_runtime.exceptions import LlmDailyQuotaExceededError
 
 EARLIER = datetime(2026, 7, 30, 5, tzinfo=timezone.utc)
 LATER = datetime(2026, 7, 30, 6, tzinfo=timezone.utc)
@@ -87,7 +85,7 @@ class QuotaGenerator(FakeGenerator):
         articles: list[StockNewsArticle],
     ) -> str:
         self.calls.append((stock_price, movement, articles))
-        raise GeminiDailyQuotaExhaustedError()
+        raise LlmDailyQuotaExceededError("daily quota")
 
 
 def _article() -> StockNewsArticle:

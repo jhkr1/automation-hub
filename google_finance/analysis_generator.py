@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
-
-from google import genai
-from google.genai.errors import ClientError
+from math import ceil
 
 from google_finance.models import (
     MAX_STOCK_INSIGHT_SUMMARY_LENGTH,
@@ -15,36 +12,13 @@ from google_finance.models import (
     count_stock_insight_sentences,
 )
 from google_finance.movement import MovementResult
+from llm_runtime.models import KeyProfile, LlmJob
+from llm_runtime.runtime import LlmRuntime
 
-DEFAULT_MODEL = "gemini-3.5-flash"
-GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 MAX_SUMMARY_LENGTH = MAX_STOCK_INSIGHT_SUMMARY_LENGTH
 INSUFFICIENT_EVIDENCE_REASON = (
     "관련 뉴스 근거가 부족해 최근 가격 변동의 가능한 배경을 확인할 수 없습니다."
 )
-DAILY_QUOTA_MARKERS = (
-    "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
-    "generativelanguage.googleapis.com/generate_content_free_tier_requests",
-)
-
-
-class GeminiDailyQuotaExhaustedError(RuntimeError):
-    """Safe internal signal for a daily Gemini request quota exhaustion."""
-
-    def __init__(self) -> None:
-        super().__init__("Gemini daily request quota exhausted")
-
-
-def is_daily_quota_exhausted(error: BaseException) -> bool:
-    """Identify the documented daily free-tier quota error without exposing details."""
-    if not isinstance(error, ClientError):
-        return False
-    if error.code != 429 or error.status != "RESOURCE_EXHAUSTED":
-        return False
-    details = repr(getattr(error, "details", ""))
-    return any(marker in details for marker in DAILY_QUOTA_MARKERS)
-
-
 def build_analysis_prompt(
     stock_price: StockPrice,
     movement: MovementResult,
@@ -109,37 +83,16 @@ Snapshot Movement:
 
 
 class GeminiStockInsightGenerator:
-    """Generate one bounded stock movement summary with Gemini."""
+    """Generate one bounded stock movement summary through LlmRuntime."""
 
-    def __init__(
-        self,
-        client: genai.Client | None = None,
-        *,
-        api_key: str | None = None,
-        model: str = DEFAULT_MODEL,
-    ) -> None:
-        if not model:
-            raise ValueError("Gemini model must not be empty")
+    def __init__(self, *, runtime: LlmRuntime, profile: KeyProfile) -> None:
+        self._runtime = runtime
+        self._profile = KeyProfile(profile)
 
-        self._client = client
-        self._api_key = api_key
-        self._model = model
-
-    def _get_client(self) -> genai.Client:
-        """Create the SDK client only when a non-empty news request needs it."""
-        if self._client is None:
-            selected_key = self._api_key or os.getenv(GEMINI_API_KEY_ENV)
-            if not selected_key:
-                raise ValueError(f"environment variable {GEMINI_API_KEY_ENV} is not set")
-            self._client = genai.Client(api_key=selected_key)
-        return self._client
-
-    def _generate_content(self, prompt: str) -> object:
-        """Call Gemini once and propagate provider errors to the application boundary."""
-        return self._get_client().models.generate_content(
-            model=self._model,
-            contents=prompt,
-        )
+    @staticmethod
+    def estimate_input_tokens(prompt: str) -> int:
+        """Return a conservative character-based input token estimate."""
+        return max(1, ceil(len(prompt) / 3))
 
     def generate_summary(
         self,
@@ -150,15 +103,15 @@ class GeminiStockInsightGenerator:
         """Generate a validated summary, or a fallback without an API call."""
         if not articles:
             return INSUFFICIENT_EVIDENCE_REASON
-        try:
-            response = self._generate_content(
-                build_analysis_prompt(stock_price, movement, articles)
-            )
-        except ClientError as exc:
-            if is_daily_quota_exhausted(exc):
-                raise GeminiDailyQuotaExhaustedError() from exc
-            raise
-        text = getattr(response, "text", None)
+        prompt = build_analysis_prompt(stock_price, movement, articles)
+        response = self._runtime.generate(
+            job=LlmJob.GOOGLE_FINANCE,
+            profile=self._profile,
+            prompt=prompt,
+            estimated_input_tokens=self.estimate_input_tokens(prompt),
+            max_output_tokens=None,
+        )
+        text = response.text
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("Gemini response text is empty or invalid")
         summary = text.strip()
