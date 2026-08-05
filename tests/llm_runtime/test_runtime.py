@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 import pytest
+from google.genai.errors import ServerError
 
 from llm_runtime.exceptions import (
     InvalidLlmJobError,
@@ -16,6 +19,7 @@ from llm_runtime.models import (
     LlmProviderResponse,
     LlmQuotaBudget,
 )
+from llm_runtime.providers.gemini import GeminiProvider
 from llm_runtime.quota import LocalFileQuotaLedger
 from llm_runtime.runtime import LlmRuntime
 
@@ -25,12 +29,13 @@ class FakeProvider:
         self.outcomes = list(outcomes)
         self.calls = []
 
-    def generate(self, *, prompt, credential, max_output_tokens=None):
+    def generate(self, *, prompt, credential, max_output_tokens=None, response_format=None):
         self.calls.append(
             {
                 "prompt": prompt,
                 "credential": credential,
                 "max_output_tokens": max_output_tokens,
+                "response_format": response_format,
             }
         )
         outcome = self.outcomes.pop(0)
@@ -157,6 +162,47 @@ def test_transient_retry_sleeps_and_reserves_again():
     assert delays == [1.0]
     assert [item["retry"] for item in ledger.reservations] == [False, True]
     assert len(provider.calls) == 2
+
+
+def test_gemini_503_is_retried_and_reserves_retry_attempt():
+    class Models:
+        def __init__(self, outcome):
+            self.outcome = outcome
+
+        def generate_content(self, **kwargs):
+            if isinstance(self.outcome, BaseException):
+                raise self.outcome
+            return self.outcome
+
+    class Client:
+        def __init__(self, outcome):
+            self.models = Models(outcome)
+
+        def close(self):
+            pass
+
+    clients = [
+        Client(ServerError(503, {"error": {"status": "UNAVAILABLE"}})),
+        Client(SimpleNamespace(text="ok")),
+    ]
+
+    def factory(_: str):
+        return clients.pop(0)
+
+    provider = GeminiProvider(factory)
+    ledger = FakeLedger()
+    delays = []
+    result = make_runtime(provider, ledger, delays.append).generate(
+        job=LlmJob.NAMUWIKI,
+        profile=KeyProfile.TEST,
+        prompt="safe prompt",
+        estimated_input_tokens=10,
+    )
+
+    assert result.request_count == 2
+    assert result.retry_count == 1
+    assert delays == [1.0]
+    assert [reservation["retry"] for reservation in ledger.reservations] == [False, True]
 
 
 def test_repeated_transient_failures_stop_at_max_attempts():

@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Mapping
 
 
 class LlmJob(StrEnum):
@@ -13,6 +14,20 @@ class LlmJob(StrEnum):
 class KeyProfile(StrEnum):
     PRODUCTION = "production"
     TEST = "test"
+
+
+@dataclass(frozen=True)
+class LlmResponseFormat:
+    """Provider-neutral response format requested by an Application."""
+
+    response_mime_type: str
+    response_schema: Mapping[str, object] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.response_mime_type.strip():
+            raise ValueError("response_mime_type must not be empty")
+        if self.response_schema is not None and not isinstance(self.response_schema, Mapping):
+            raise TypeError("response_schema must be a mapping")
 
 
 @dataclass(frozen=True)

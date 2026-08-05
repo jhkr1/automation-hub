@@ -2,13 +2,18 @@
 
 from typing import Protocol
 
-from llm_runtime.models import LlmCredential, LlmProviderResponse
+from llm_runtime.models import LlmCredential, LlmProviderResponse, LlmResponseFormat
 
 
 class LlmProvider(Protocol):
     """Generate text using a resolved credential."""
 
     def generate(
-        self, *, prompt: str, credential: LlmCredential, max_output_tokens: int | None = None
+        self,
+        *,
+        prompt: str,
+        credential: LlmCredential,
+        max_output_tokens: int | None = None,
+        response_format: LlmResponseFormat | None = None,
     ) -> LlmProviderResponse:
         """Return provider text for one prompt."""

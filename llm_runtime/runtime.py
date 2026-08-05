@@ -17,6 +17,7 @@ from llm_runtime.models import (
     LlmProviderResponse,
     LlmQuotaBudget,
     LlmResponse,
+    LlmResponseFormat,
 )
 from llm_runtime.quota import LocalFileQuotaLedger
 from llm_runtime.settings import resolve_llm_credential, resolve_quota_budget
@@ -72,6 +73,7 @@ class LlmRuntime:
         prompt: str,
         estimated_input_tokens: int,
         max_output_tokens: int | None = None,
+        response_format: LlmResponseFormat | None = None,
     ) -> LlmResponse:
         """Generate text with one reservation per provider attempt."""
         self._validate_input(
@@ -98,11 +100,14 @@ class LlmRuntime:
                 retry=attempt > 0,
             )
             try:
-                response = self._provider.generate(
-                    prompt=prompt,
-                    credential=credential,
-                    max_output_tokens=max_output_tokens,
-                )
+                provider_kwargs = {
+                    "prompt": prompt,
+                    "credential": credential,
+                    "max_output_tokens": max_output_tokens,
+                }
+                if response_format is not None:
+                    provider_kwargs["response_format"] = response_format
+                response = self._provider.generate(**provider_kwargs)
             except (LlmRateLimitError, LlmProviderUnavailableError) as exc:
                 request_count += 1
                 if attempt + 1 == self._max_attempts:
