@@ -1,5 +1,7 @@
 """LlmRuntime을 사용한 나무위키 실시간 검색어 등재 이유 생성."""
 
+import json
+from collections.abc import Mapping, Sequence
 from math import ceil
 
 from llm_runtime.models import KeyProfile, LlmJob
@@ -9,6 +11,164 @@ from namuwiki_trend.models import NewsArticle, TrendItem
 MAX_REASON_LENGTH = 300
 MAX_PROMPT_LENGTH = 12_000
 INSUFFICIENT_EVIDENCE_REASON = "제공된 기사만으로는 정확한 이유를 확인하기 어렵다."
+
+BATCH_MAX_OUTPUT_TOKENS = 2048
+
+
+class BatchAnalysisError(ValueError):
+    """Batch 분석 응답이 안전하게 해석되지 않을 때 발생하는 오류."""
+
+
+class BatchResponseError(BatchAnalysisError):
+    """Batch 응답의 JSON 또는 필드 계약이 잘못되었을 때 발생하는 오류."""
+
+
+class BatchMappingError(BatchAnalysisError):
+    """Batch 응답을 입력 분석 대상에 매핑할 수 없을 때 발생하는 오류."""
+
+
+BatchInput = tuple[TrendItem, list[NewsArticle]]
+BatchKey = tuple[int, str]
+
+
+def _validate_batch_inputs(items: Sequence[BatchInput]) -> list[BatchInput]:
+    """Batch 입력의 rank와 keyword 식별자가 유일한지 확인한다."""
+    if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
+        raise TypeError(f"items가 Sequence가 아님: {type(items).__name__}")
+    normalized: list[BatchInput] = []
+    ranks: set[int] = set()
+    keywords: set[str] = set()
+    for index, pair in enumerate(items, start=1):
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise TypeError(f"items[{index}]가 (TrendItem, articles) 쌍이 아님")
+        trend, articles = pair
+        if not isinstance(trend, TrendItem):
+            raise TypeError(f"items[{index}]의 trend가 TrendItem이 아님")
+        if not isinstance(articles, list):
+            raise TypeError(f"items[{index}]의 articles가 list가 아님")
+        if type(trend.rank) is not int or trend.rank <= 0:
+            raise BatchMappingError("입력 rank가 유효하지 않음")
+        keyword = trend.keyword.strip()
+        if not keyword:
+            raise BatchMappingError("입력 keyword가 비어 있음")
+        if trend.rank in ranks:
+            raise BatchMappingError("입력 rank가 중복됨")
+        if keyword in keywords:
+            raise BatchMappingError("입력 keyword가 중복됨")
+        ranks.add(trend.rank)
+        keywords.add(keyword)
+        normalized.append((trend, articles))
+    if not normalized:
+        raise BatchMappingError("Batch 분석 대상이 없음")
+    return normalized
+
+
+def build_batch_reason_prompt(items: Sequence[BatchInput]) -> str:
+    """뉴스가 있는 검색어들의 Batch 분석 Prompt를 만든다."""
+    validated = _validate_batch_inputs(items)
+    blocks: list[str] = []
+    for trend, articles in validated:
+        article_blocks: list[str] = []
+        for index, article in enumerate(articles, start=1):
+            if not isinstance(article, NewsArticle):
+                raise TypeError(f"{trend.keyword} articles[{index}]가 NewsArticle가 아님")
+            title = article.title.strip()
+            if not title:
+                raise ValueError(f"{trend.keyword} articles[{index}]의 title이 비어 있음")
+            source = article.source.strip() if article.source else "확인되지 않음"
+            published_at = (
+                article.published_at.isoformat() if article.published_at else "확인되지 않음"
+            )
+            article_blocks.append(
+                f"- 제목: {title}\n- 출처: {source}\n- 게시 시각: {published_at}"
+            )
+        blocks.append(
+            f"[분석 대상]\n- rank: {trend.rank}\n- keyword: {trend.keyword}\n"
+            f"뉴스 문맥:\n{chr(10).join(article_blocks)}"
+        )
+
+    prompt = (
+        "당신은 실시간 검색어의 발생 배경을 제공된 뉴스 문맥에만 근거해\n"
+        "짧고 신중하게 설명하는 분석가다.\n\n"
+        f"분석 대상:\n{chr(10).join(blocks)}\n\n"
+        "규칙:\n"
+        "- 입력된 rank와 keyword를 그대로 유지한다.\n"
+        "- 입력에 없는 keyword나 rank를 만들지 않는다.\n"
+        "- 각 대상마다 한국어 2~3문장으로 작성한다.\n"
+        "- 제공된 뉴스 근거 안에서만 설명한다.\n"
+        "- 사실 확인이 불가능한 원인을 단정하지 않는다.\n"
+        "- 광고성 문구와 투자 조언을 포함하지 않는다.\n\n"
+        "출력:\n"
+        "- 정확한 JSON 객체 하나만 반환한다.\n"
+        "- Markdown code fence를 사용하지 않는다.\n"
+        "- 모든 분석 대상에 대해 items 배열의 item을 하나씩 반환한다.\n"
+        '- 형식: {"items": [{"rank": 1, "keyword": "...", "reason": "..."}]}'
+    )
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        raise ValueError(
+            f"Batch Prompt가 최대 길이를 초과함: {len(prompt)}자, 최대 {MAX_PROMPT_LENGTH}자"
+        )
+    return prompt
+
+
+def _strip_json_code_fence(text: str) -> str:
+    """응답 전체를 감싼 단일 JSON code fence만 제거한다."""
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) < 3 or lines[0] not in {"```", "```json"} or lines[-1] != "```":
+        raise BatchResponseError("malformed_code_fence")
+    return "\n".join(lines[1:-1]).strip()
+
+
+def parse_batch_reason_response(text: str, items: Sequence[BatchInput]) -> dict[BatchKey, str]:
+    """Strict JSON Batch 응답을 입력 rank와 keyword에 매핑한다."""
+    validated = _validate_batch_inputs(items)
+    if not isinstance(text, str):
+        raise BatchResponseError("response_text_not_string")
+    try:
+        payload = json.loads(_strip_json_code_fence(text))
+    except json.JSONDecodeError as exc:
+        raise BatchResponseError("malformed_json") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        raise BatchResponseError("items_array_required")
+
+    expected: set[BatchKey] = {(trend.rank, trend.keyword) for trend, _ in validated}
+    expected_ranks = {rank for rank, _ in expected}
+    expected_keywords = {keyword for _, keyword in expected}
+    result: dict[BatchKey, str] = {}
+    for item in payload["items"]:
+        if not isinstance(item, dict):
+            raise BatchResponseError("item_object_required")
+        if set(item) != {"rank", "keyword", "reason"}:
+            raise BatchResponseError("unexpected_item_field")
+        rank = item["rank"]
+        keyword = item["keyword"]
+        reason = item["reason"]
+        if type(rank) is not int or rank <= 0:
+            raise BatchResponseError("rank_must_be_positive_int")
+        if not isinstance(keyword, str) or not keyword.strip():
+            raise BatchResponseError("keyword_must_be_non_empty_string")
+        if not isinstance(reason, str) or not reason.strip():
+            raise BatchResponseError("reason_must_be_non_empty_string")
+        if rank not in expected_ranks:
+            raise BatchMappingError("unknown_rank")
+        if keyword not in expected_keywords:
+            raise BatchMappingError("unknown_keyword")
+        key = (rank, keyword)
+        if key not in expected:
+            raise BatchMappingError("rank_keyword_pair_mismatch")
+        if key in result:
+            raise BatchMappingError("duplicate_item")
+        normalized_reason = reason.strip()
+        if len(normalized_reason) > MAX_REASON_LENGTH:
+            raise BatchResponseError("reason_too_long")
+        result[key] = normalized_reason
+
+    if expected - set(result):
+        raise BatchMappingError("missing_item")
+    return result
 def build_reason_prompt(trend: TrendItem, articles: list[NewsArticle]) -> str:
     """TrendItem과 뉴스 문맥을 grounding한 등재 이유 생성 Prompt를 만든다."""
     if not isinstance(trend, TrendItem):
@@ -108,3 +268,19 @@ class GeminiReasonGenerator:
             )
 
         return reason
+
+    def generate_reasons(self, items: Sequence[BatchInput]) -> Mapping[BatchKey, str]:
+        """뉴스가 있는 여러 검색어의 reason을 Runtime 한 번으로 생성한다."""
+        validated = _validate_batch_inputs(items)
+        prompt = build_batch_reason_prompt(validated)
+        response = self._runtime.generate(
+            job=LlmJob.NAMUWIKI,
+            profile=self._profile,
+            prompt=prompt,
+            estimated_input_tokens=self.estimate_input_tokens(prompt),
+            max_output_tokens=BATCH_MAX_OUTPUT_TOKENS,
+        )
+        response_text = getattr(response, "text", None)
+        if not isinstance(response_text, str):
+            raise BatchResponseError("response_text_missing")
+        return parse_batch_reason_response(response_text, validated)

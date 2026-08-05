@@ -29,4 +29,7 @@ class TrendPipeline:
     def run(self) -> list[TrendInsight]:
         """Collector 결과를 입력 순서대로 enrichment하여 반환한다."""
         trends = self._collector()
+        enrich_all = getattr(self._enricher, "enrich_all", None)
+        if callable(enrich_all):
+            return enrich_all(trends)
         return [self._enricher.enrich(trend) for trend in trends]

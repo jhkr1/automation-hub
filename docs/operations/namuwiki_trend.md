@@ -76,10 +76,14 @@ python -m namuwiki_trend.main --key-profile test
 ./run_namuwiki_snapshot.sh
 ```
 
-Gemini가 포함된 전체 enrichment는 Top 10 항목을 순차적으로 처리한다. RetryInfo가 있는
-일시적 `429 RESOURCE_EXHAUSTED`에는 제한적으로 재시도하지만, 일일 quota marker가 있는
-오류는 재시도하지 않고 현재 실행을 중단한다. 무료 quota를 고려해 하루 1회 실행을
-권장한다. Snapshot만 수집하는 `snapshot_main`은 2시간 주기부터 시작할 수 있다.
+Gemini가 포함된 전체 enrichment는 뉴스가 있는 Top 10 항목을 하나의 JSON Batch로 처리한다.
+정상 실행에서 `LlmRuntime` 호출은 최대 1회이며, 뉴스가 없는 항목은 기존 근거 부족
+fallback을 사용한다. Batch 응답의 rank·keyword·reason 매핑이 완전하지 않으면 전체 분석을
+실패시키고 기존 `output/trend_insights.json`은 유지한다. 일시적 Provider 오류의 retry와
+quota reservation은 `LlmRuntime`이 담당한다. 무료 quota를 고려해 cron 등록 전에는 `test`
+profile로 수동 smoke test를 수행한다. 현재 production artifact 경로는 기존과 동일하며,
+test artifact 분리는 다음 Batch Sprint의 범위다. Snapshot만 수집하는 `snapshot_main`은
+2시간 주기부터 시작할 수 있다.
 
 예시:
 
