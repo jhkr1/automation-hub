@@ -57,10 +57,20 @@ snapshot은 `trend_snapshots`에 저장되고, Daily Trend 조회는 `collection
 표준 종료 코드 `124`, 신호 중단은 각각 `130`과 `143`으로 기록된다.
 
 ```bash
-./run_namuwiki_trend.sh
+./run_namuwiki_trend.sh --key-profile production
+./run_namuwiki_trend.sh --key-profile test
 ```
 
 Gemini를 호출하지 않는 Snapshot 수집은 별도 Wrapper로 실행한다.
+
+Namuwiki enrichment는 `production` 또는 수동 smoke test용 `test` profile을 명시한다.
+선택된 profile 이름만 Python entrypoint로 전달하며, credential 선택·quota reservation·retry는
+`LlmRuntime`이 담당한다. 선택된 Namuwiki key만 사용하며 다른 job/profile key로 fallback하지
+않는다.
+
+```bash
+python -m namuwiki_trend.main --key-profile test
+```
 
 ```bash
 ./run_namuwiki_snapshot.sh

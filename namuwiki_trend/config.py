@@ -22,10 +22,11 @@ class Settings(BaseSettings):
 
     naver_client_id: str | None = None
     naver_client_secret: str | None = None
-    gemini_api_key: str
+    gemini_api_key: str | None = None
     log_level: str = "INFO"
 
-    model_config = {"env_file": PROJECT_ROOT / ".env"}
+    model_config = {"env_file": PROJECT_ROOT / ".env", "extra": "ignore"}
+
 
 
 def get_logger(name: str, level: str = "INFO") -> logging.Logger:

@@ -1,41 +1,14 @@
-"""Gemini를 사용한 나무위키 실시간 검색어 등재 이유 생성."""
+"""LlmRuntime을 사용한 나무위키 실시간 검색어 등재 이유 생성."""
 
-import os
-import re
-import time
-from collections.abc import Callable
+from math import ceil
 
-from google import genai
-from google.genai import errors
-
+from llm_runtime.models import KeyProfile, LlmJob
+from llm_runtime.runtime import LlmRuntime
 from namuwiki_trend.models import NewsArticle, TrendItem
 
-DEFAULT_MODEL = "gemini-3.5-flash"
-GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 MAX_REASON_LENGTH = 300
 MAX_PROMPT_LENGTH = 12_000
 INSUFFICIENT_EVIDENCE_REASON = "제공된 기사만으로는 정확한 이유를 확인하기 어렵다."
-DEFAULT_MIN_REQUEST_INTERVAL_SECONDS = 12.0
-DEFAULT_MAX_RETRIES = 2
-DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
-DAILY_QUOTA_MARKERS = (
-    "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
-    "generativelanguage.googleapis.com/generate_content_free_tier_requests",
-)
-Clock = Callable[[], float]
-Sleeper = Callable[[float], None]
-
-
-def is_daily_quota_exhausted(error: BaseException) -> bool:
-    """Return whether an SDK error identifies a daily request quota exhaustion."""
-    if not isinstance(error, errors.ClientError):
-        return False
-    if error.code != 429 or error.status != "RESOURCE_EXHAUSTED":
-        return False
-    details = repr(getattr(error, "details", ""))
-    return any(marker in details for marker in DAILY_QUOTA_MARKERS)
-
-
 def build_reason_prompt(trend: TrendItem, articles: list[NewsArticle]) -> str:
     """TrendItem과 뉴스 문맥을 grounding한 등재 이유 생성 Prompt를 만든다."""
     if not isinstance(trend, TrendItem):
@@ -100,107 +73,29 @@ def build_reason_prompt(trend: TrendItem, articles: list[NewsArticle]) -> str:
 
 
 class GeminiReasonGenerator:
-    """Gemini API로 TrendItem 하나의 등재 이유를 생성한다."""
+    """LlmRuntime으로 TrendItem 하나의 등재 이유를 생성한다."""
 
-    def __init__(
-        self,
-        client: genai.Client | None = None,
-        *,
-        model: str = DEFAULT_MODEL,
-        min_request_interval_seconds: float = DEFAULT_MIN_REQUEST_INTERVAL_SECONDS,
-        max_retries: int = DEFAULT_MAX_RETRIES,
-        retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
-        clock: Clock = time.monotonic,
-        sleeper: Sleeper = time.sleep,
-    ) -> None:
-        if not model:
-            raise ValueError("Gemini model이 비어 있음")
-        if min_request_interval_seconds < 0:
-            raise ValueError("min_request_interval_seconds는 0 이상이어야 함")
-        if type(max_retries) is not int or max_retries < 0:
-            raise ValueError("max_retries는 0 이상의 정수여야 함")
-        if retry_backoff_seconds <= 0:
-            raise ValueError("retry_backoff_seconds는 양수여야 함")
-
-        if client is None:
-            api_key = os.getenv(GEMINI_API_KEY_ENV)
-            if not api_key:
-                raise ValueError(f"환경 변수 {GEMINI_API_KEY_ENV}가 설정되지 않음")
-            client = genai.Client(api_key=api_key)
-
-        self._client = client
-        self._model = model
-        self._min_request_interval_seconds = min_request_interval_seconds
-        self._max_retries = max_retries
-        self._retry_backoff_seconds = retry_backoff_seconds
-        self._clock = clock
-        self._sleeper = sleeper
-        self._last_request_at: float | None = None
-
-    def _wait_for_request_interval(self) -> None:
-        """직전 Gemini 요청 이후 최소 간격이 지나도록 대기한다."""
-        now = self._clock()
-        if self._last_request_at is not None:
-            remaining = self._min_request_interval_seconds - (now - self._last_request_at)
-            if remaining > 0:
-                self._sleeper(remaining)
-        self._last_request_at = self._clock()
+    def __init__(self, *, runtime: LlmRuntime, profile: KeyProfile) -> None:
+        self._runtime = runtime
+        self._profile = KeyProfile(profile)
 
     @staticmethod
-    def _retry_delay_seconds(error: errors.ClientError) -> float | None:
-        """SDK 오류의 RetryInfo retryDelay를 초 단위로 읽는다."""
-        details = error.details
-        if not isinstance(details, dict):
-            return None
-        error_body = details.get("error", {})
-        if not isinstance(error_body, dict):
-            return None
-        error_details = error_body.get("details", [])
-        if not isinstance(error_details, list):
-            return None
-        for detail in error_details:
-            if not isinstance(detail, dict):
-                continue
-            if detail.get("@type", "").endswith("RetryInfo"):
-                retry_delay = detail.get("retryDelay")
-                if isinstance(retry_delay, str):
-                    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)s", retry_delay)
-                    if match:
-                        return float(match.group(1))
-        return None
-
-    def _generate_content(self, prompt: str) -> object:
-        """Rate limit과 제한된 quota retry를 적용해 SDK를 호출한다."""
-        for retry_index in range(self._max_retries + 1):
-            self._wait_for_request_interval()
-            try:
-                return self._client.models.generate_content(
-                    model=self._model,
-                    contents=prompt,
-                )
-            except errors.ClientError as exc:
-                is_quota_error = exc.code == 429 and exc.status == "RESOURCE_EXHAUSTED"
-                if (
-                    not is_quota_error
-                    or is_daily_quota_exhausted(exc)
-                    or retry_index == self._max_retries
-                ):
-                    raise
-                delay = self._retry_delay_seconds(exc)
-                if delay is None:
-                    delay = self._retry_backoff_seconds * (2**retry_index)
-                self._sleeper(delay)
-        raise AssertionError("unreachable")
+    def estimate_input_tokens(prompt: str) -> int:
+        """문자 수 기반의 보수적인 입력 token 추정치를 반환한다."""
+        return max(1, ceil(len(prompt) / 3))
 
     def generate_reason(self, trend: TrendItem, articles: list[NewsArticle]) -> str:
         """TrendItem과 뉴스 문맥에 대한 짧은 설명을 생성한다."""
         prompt = build_reason_prompt(trend, articles)
-        response = self._generate_content(prompt)
+        response = self._runtime.generate(
+            job=LlmJob.NAMUWIKI,
+            profile=self._profile,
+            prompt=prompt,
+            estimated_input_tokens=self.estimate_input_tokens(prompt),
+            max_output_tokens=None,
+        )
 
-        if response is None:
-            raise RuntimeError("Gemini 응답 객체가 없음")
-
-        text = getattr(response, "text", None)
+        text = response.text
         if not isinstance(text, str):
             raise RuntimeError("Gemini 응답 text가 문자열이 아님")
 

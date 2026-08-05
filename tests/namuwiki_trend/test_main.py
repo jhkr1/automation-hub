@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from llm_runtime.models import KeyProfile
 from namuwiki_trend.main import build_pipeline, collect_trends, main, run_application
 from namuwiki_trend.models import TrendInsight, TrendItem
 
@@ -63,8 +64,9 @@ def test_build_pipeline_composes_runtime_dependencies(monkeypatch) -> None:
             created["news_provider"] = self
 
     class FakeReasonGenerator:
-        def __init__(self) -> None:
+        def __init__(self, *, runtime: object, profile: KeyProfile) -> None:
             created["reason_generator"] = self
+            created["reason_generator_args"] = (runtime, profile)
 
     class FakeEnricher:
         def __init__(self, news_provider: object, reason_generator: object) -> None:
@@ -77,16 +79,18 @@ def test_build_pipeline_composes_runtime_dependencies(monkeypatch) -> None:
 
     monkeypatch.setattr("namuwiki_trend.main.NewsContextProvider", FakeNewsProvider)
     monkeypatch.setattr("namuwiki_trend.main.GeminiReasonGenerator", FakeReasonGenerator)
+    monkeypatch.setattr("namuwiki_trend.main.build_llm_runtime", lambda: "runtime")
     monkeypatch.setattr("namuwiki_trend.main.TrendEnricher", FakeEnricher)
     monkeypatch.setattr("namuwiki_trend.main.TrendPipeline", FakePipeline)
 
-    result = build_pipeline()
+    result = build_pipeline(KeyProfile.TEST)
 
     assert isinstance(result, FakePipeline)
     assert created["enricher_args"] == (
         created["news_provider"],
         created["reason_generator"],
     )
+    assert created["reason_generator_args"] == ("runtime", KeyProfile.TEST)
     assert created["pipeline_args"] == (collect_trends, created["enricher"])
 
 
@@ -111,10 +115,12 @@ def test_main_returns_zero_when_application_succeeds(monkeypatch, capsys) -> Non
     """Application 성공 시 zero 종료 코드를 반환한다."""
     output_path = Path("output/trend_insights.json")
     monkeypatch.setattr("namuwiki_trend.main.run_application", lambda *args: output_path)
-    monkeypatch.setattr("namuwiki_trend.main.build_pipeline", lambda: object())
+    monkeypatch.setattr(
+        "namuwiki_trend.main.build_pipeline", lambda profile: object()
+    )
     monkeypatch.setattr("namuwiki_trend.main.JsonTrendInsightStorage", lambda: object())
 
-    assert main() == 0
+    assert main(["--key-profile", "test"]) == 0
     captured = capsys.readouterr()
     assert "결과 저장 완료" in captured.out
     assert captured.err == ""
@@ -128,10 +134,24 @@ def test_main_returns_one_when_application_fails(monkeypatch, capsys) -> None:
         raise expected
 
     monkeypatch.setattr("namuwiki_trend.main.run_application", fail)
-    monkeypatch.setattr("namuwiki_trend.main.build_pipeline", lambda: object())
+    monkeypatch.setattr(
+        "namuwiki_trend.main.build_pipeline", lambda profile: object()
+    )
     monkeypatch.setattr("namuwiki_trend.main.JsonTrendInsightStorage", lambda: object())
 
-    assert main() == 1
+    assert main(["--key-profile", "test"]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "실행 실패" in captured.err
+
+
+def test_main_requires_key_profile() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main([])
+    assert raised.value.code == 2
+
+
+def test_main_rejects_invalid_key_profile() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--key-profile", "invalid"])
+    assert raised.value.code == 2

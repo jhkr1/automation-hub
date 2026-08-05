@@ -53,6 +53,12 @@ trap 'forward_signal INT 130' INT
 start_time="$(date --iso-8601=seconds)"
 echo "[$start_time] start"
 
+if [[ "$#" -ne 2 || "$1" != "--key-profile" || ( "$2" != "production" && "$2" != "test" ) ]]; then
+    echo "usage: $0 --key-profile production|test" >&2
+    finish 2
+fi
+key_profile="$2"
+
 if ! [[ "$TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
     echo "[$(date --iso-8601=seconds)] failed: invalid timeout configuration"
     finish 78
@@ -84,10 +90,15 @@ if ! . "$REPO_ROOT/.env"; then
 fi
 set +a
 
-require_env GEMINI_API_KEY
+export APP_ENV="$key_profile"
+if [[ "$key_profile" == "production" ]]; then
+    require_env GEMINI_NAMUWIKI_API_KEY_PROD
+else
+    require_env GEMINI_NAMUWIKI_API_KEY_TEST
+fi
 
 timeout --signal=TERM --kill-after=30s "${TIMEOUT_SECONDS}s" \
-    "$PYTHON" -m namuwiki_trend.main &
+    "$PYTHON" -m namuwiki_trend.main --key-profile "$key_profile" &
 child_pid="$!"
 wait "$child_pid"
 status="$?"
