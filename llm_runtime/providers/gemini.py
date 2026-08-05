@@ -17,7 +17,7 @@ from llm_runtime.exceptions import (
     LlmRateLimitError,
     LlmRuntimeError,
 )
-from llm_runtime.models import LlmCredential, LlmProviderResponse
+from llm_runtime.models import LlmCredential, LlmProviderResponse, LlmResponseFormat
 
 DAILY_MARKER = "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
 LOGGER = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class GeminiProvider:
         prompt: str,
         credential: LlmCredential,
         max_output_tokens: int | None = None,
+        response_format: LlmResponseFormat | None = None,
     ) -> LlmProviderResponse:
         client: Any | None = None
         try:
