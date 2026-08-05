@@ -6,6 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 import pytest
+from streamlit.testing.v1 import AppTest
 
 from automation_dashboard.ui.formatting import (
     MISSING_VALUE,
@@ -92,3 +93,24 @@ def test_dashboard_pages_are_importable_without_running_database_queries(module_
     """Each page exposes a render entrypoint while preserving read-only test isolation."""
     module = import_module(module_name)
     assert callable(module.main)
+
+
+@pytest.mark.parametrize(
+    "script_path",
+    [
+        "automation_dashboard/app.py",
+        "automation_dashboard/pages/1_google_finance.py",
+        "automation_dashboard/pages/2_namuwiki.py",
+        "automation_dashboard/pages/3_operations.py",
+    ],
+)
+def test_dashboard_app_pages_render_without_database_or_external_llm(
+    monkeypatch: pytest.MonkeyPatch,
+    script_path: str,
+) -> None:
+    """AppTest covers the page shell with an isolated, empty SQLite configuration."""
+    monkeypatch.setenv("DASHBOARD_DATABASE_URL", "sqlite+pysqlite:///:memory:")
+
+    app = AppTest.from_file(script_path).run(timeout=20)
+
+    assert not app.exception

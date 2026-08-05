@@ -15,8 +15,15 @@ from automation_dashboard.queries.namuwiki import (
     list_latest_snapshot,
     load_snapshot_summary,
 )
+from automation_dashboard.readers.namuwiki_insights import (
+    InsightStatus,
+    NamuwikiInsightReadModel,
+    NamuwikiInsightRow,
+    read_namuwiki_insights,
+)
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
 from automation_dashboard.ui.formatting import (
+    format_duration,
     format_integer,
     format_kst_datetime,
 )
@@ -60,6 +67,12 @@ def _load_snapshot_summary() -> SnapshotSummary:
         return load_snapshot_summary(session)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_insights() -> NamuwikiInsightReadModel:
+    """Cache detached artifact data without modifying the production file."""
+    return read_namuwiki_insights()
+
+
 def _latest_rows(rows: list[LatestTrendRow]) -> list[dict[str, object]]:
     """Map persisted trend DTOs to the focused latest Top 10 table."""
     return [{"Rank": row.rank_position, "Keyword": row.keyword} for row in rows]
@@ -79,6 +92,76 @@ def _statistics_rows(rows: list[KeywordSummary]) -> list[dict[str, object]]:
     ]
 
 
+def _insight_rows(rows: tuple[NamuwikiInsightRow, ...]) -> list[dict[str, object]]:
+    """Map artifact DTOs to concise table values."""
+    return [
+        {
+            "Rank": row.rank,
+            "Keyword": row.keyword,
+            "Reason": row.reason,
+            "Articles": row.article_count,
+            "Generated At": format_kst_datetime(row.generated_at_kst),
+        }
+        for row in rows
+    ]
+
+
+def _render_insights(model: NamuwikiInsightReadModel) -> None:
+    """Render artifact status and insight details without calling Gemini."""
+    render_section_header(
+        "LLM Trend Insights",
+        "저장된 Namuwiki artifact만 조회합니다. Dashboard는 Gemini를 호출하지 않습니다.",
+    )
+    kpi_columns = st.columns(4)
+    kpi_columns[0].metric("Status", model.status.value)
+    kpi_columns[1].metric(
+        "Generated At",
+        format_kst_datetime(model.generated_at_kst),
+    )
+    kpi_columns[2].metric("Insight Items", format_integer(len(model.rows)))
+    kpi_columns[3].metric("Data Age", format_duration(model.age))
+
+    if model.status in {InsightStatus.NO_DATA, InsightStatus.PLANNED}:
+        render_empty_state(model.message or "분석 결과가 없습니다.")
+        return
+    if model.status in {InsightStatus.INVALID_ARTIFACT, InsightStatus.UNAVAILABLE}:
+        st.error(model.message or "LLM Insight artifact를 읽을 수 없습니다.")
+        return
+    if not model.rows:
+        render_empty_state("저장된 LLM Insight item이 없습니다.")
+        return
+
+    selected_keyword = st.selectbox(
+        "Insight 검색어 선택",
+        options=[row.keyword for row in model.rows],
+        key="namuwiki-insight-keyword",
+    )
+    selected = next(row for row in model.rows if row.keyword == selected_keyword)
+    render_information_card(
+        "Selected Insight",
+        primary=("Keyword", selected.keyword),
+        details=(
+            ("Rank", str(selected.rank)),
+            ("Articles", format_integer(selected.article_count)),
+            ("Generated At", format_kst_datetime(selected.generated_at_kst)),
+            ("Status", selected.status.value),
+        ),
+    )
+    st.write(selected.reason)
+    st.dataframe(
+        pd.DataFrame(_insight_rows(model.rows)),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Rank": st.column_config.NumberColumn(width="small"),
+            "Keyword": st.column_config.TextColumn(width="medium"),
+            "Reason": st.column_config.TextColumn(width="large"),
+            "Articles": st.column_config.NumberColumn(width="small"),
+            "Generated At": st.column_config.TextColumn(width="medium"),
+        },
+    )
+
+
 def main() -> None:
     """Render the Namuwiki read-only snapshot view."""
     render_sidebar_context()
@@ -86,6 +169,7 @@ def main() -> None:
         latest_snapshot = _load_latest_snapshot()
         summary = _load_snapshot_summary()
         statistics = _load_keyword_statistics()
+        insights = _load_insights()
     except (DashboardConfigurationError, DashboardDatabaseError):
         render_page_header("Namuwiki Trends", "저장된 Top 10 Snapshot을 조회합니다.")
         render_database_error()
@@ -97,6 +181,7 @@ def main() -> None:
         "수집·enrichment·Gemini 호출·저장 작업은 수행하지 않습니다.",
         last_updated=summary.latest_collected_at,
     )
+    _render_insights(insights)
     if not latest_snapshot:
         render_empty_state(
             "저장된 Namuwiki Snapshot이 없습니다. 먼저 snapshot job 상태를 확인하세요."

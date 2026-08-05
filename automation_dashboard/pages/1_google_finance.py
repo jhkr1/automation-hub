@@ -13,6 +13,10 @@ from automation_dashboard.queries.google_finance import (
     load_latest_delta,
     load_price_history,
 )
+from automation_dashboard.readers.google_finance_insights import (
+    GoogleFinanceInsightReadModel,
+    read_google_finance_insights,
+)
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
 from automation_dashboard.ui.formatting import (
     format_kst_date,
@@ -55,6 +59,12 @@ def _load_latest_delta(symbol: str) -> SnapshotDelta | None:
         return load_latest_delta(session, symbol)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_insights() -> GoogleFinanceInsightReadModel:
+    """Cache the placeholder read model without reading or creating an artifact."""
+    return read_google_finance_insights()
+
+
 def _quote_table_rows(quotes: list[LatestQuoteRow]) -> list[dict[str, object]]:
     """Map latest quote DTOs to concise UI columns without exposing ORM objects."""
     return [
@@ -88,6 +98,16 @@ def _selected_label(symbol: str, quotes: list[LatestQuoteRow]) -> str:
     return f"{quote.name} ({symbol})"
 
 
+def _render_insights(model: GoogleFinanceInsightReadModel) -> None:
+    """Render the future insight contract without fabricating analysis data."""
+    render_section_header(
+        "LLM Stock Insights",
+        "Google Finance 분석 artifact가 준비되면 연결할 read-only 영역입니다.",
+    )
+    st.metric("Status", model.status.value)
+    render_empty_state(model.message)
+
+
 def main() -> None:
     """Render the Google Finance read-only snapshot view."""
     render_sidebar_context()
@@ -104,6 +124,7 @@ def main() -> None:
         "저장된 가격 Snapshot을 조회합니다. 수집·분석·저장 작업은 수행하지 않습니다.",
         last_updated=latest_collected_at,
     )
+    _render_insights(_load_insights())
     if not quotes:
         render_empty_state(
             "저장된 Google Finance Snapshot이 없습니다. 먼저 collect job 상태를 확인하세요."

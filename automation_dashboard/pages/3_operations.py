@@ -16,6 +16,8 @@ from automation_dashboard.queries.operations import (
     load_runtime_info,
     load_snapshot_summary,
 )
+from automation_dashboard.readers.llm_usage import LlmUsageReadModel, read_llm_usage
+from automation_dashboard.readers.namuwiki_insights import InsightStatus
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
 from automation_dashboard.ui.formatting import (
     format_file_size,
@@ -72,6 +74,50 @@ def _load_runtime_info() -> RuntimeInfo:
     return load_runtime_info()
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_llm_usage() -> LlmUsageReadModel:
+    """Cache safe quota ledger metadata without caching file handles."""
+    return read_llm_usage()
+
+
+def _render_llm_usage(model: LlmUsageReadModel) -> None:
+    """Render quota counts only; keys, prompts, and responses never enter the UI."""
+    render_section_header(
+        "LLM Runtime",
+        "Quota ledger의 읽기 전용 상태입니다. Provider 호출과 ledger 변경은 수행하지 않습니다.",
+    )
+    usage_columns = st.columns(3)
+    usage_columns[0].metric("Ledger Status", model.status.value)
+    usage_columns[1].metric("Retry Count", format_integer(model.retry_count))
+    usage_columns[2].metric(
+        "Last Request",
+        format_kst_datetime(model.last_request_at_kst),
+    )
+    if model.status in {InsightStatus.NO_DATA, InsightStatus.UNAVAILABLE}:
+        render_empty_state(model.message or "LLM usage 정보가 없습니다.")
+        return
+    if not model.profiles:
+        render_empty_state("오늘 LLM 요청 기록이 없습니다.")
+        return
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Project Profile": profile.project_profile,
+                    "Requests Today": profile.requests_today,
+                }
+                for profile in model.profiles
+            ]
+        ),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Project Profile": st.column_config.TextColumn(width="medium"),
+            "Requests Today": st.column_config.NumberColumn(width="small"),
+        },
+    )
+
+
 def main() -> None:
     """Render the read-only operations overview without starting any automation."""
     render_sidebar_context()
@@ -85,6 +131,7 @@ def main() -> None:
         return
     logs = _load_log_summary()
     runtime = _load_runtime_info()
+    llm_usage = _load_llm_usage()
 
     latest_times = [
         value
@@ -181,6 +228,8 @@ def main() -> None:
             ("Working Directory", format_repository_location(runtime.working_directory)),
         ),
     )
+
+    _render_llm_usage(llm_usage)
 
     render_section_header("Recent Activity", "가장 최근에 저장된 각 Package의 Snapshot입니다.")
     if not latest_times:
