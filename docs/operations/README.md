@@ -9,6 +9,9 @@ python scripts/verify.py
 패키지별 실행과 외부 서비스 설정은 각 패키지 문서에서 관리한다. Production Wrapper,
 cron, 로그와 종료 코드 같은 반복 운영 절차는 이 디렉터리의 문서에서 관리한다.
 
+Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여러 key는 quota를
+공유하며, production/test quota를 분리하려면 별도 Project가 필요하다.
+
 ## 운영 문서
 
 - [`namuwiki_trend 운영 절차`](namuwiki_trend.md): Snapshot, MySQL, 전체 enrichment와 Wrapper
