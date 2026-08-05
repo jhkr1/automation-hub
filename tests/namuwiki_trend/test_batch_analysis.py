@@ -40,13 +40,19 @@ def _items() -> list[tuple[TrendItem, list[NewsArticle]]]:
 class FakeRuntime:
     """Batch Runtime 호출을 기록하는 Fake."""
 
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, finish_reason=None, output_tokens=None) -> None:
         self.text = text
+        self.finish_reason = finish_reason
+        self.output_tokens = output_tokens
         self.calls: list[dict[str, object]] = []
 
     def generate(self, **kwargs: object) -> SimpleNamespace:
         self.calls.append(kwargs)
-        return SimpleNamespace(text=self.text)
+        return SimpleNamespace(
+            text=self.text,
+            finish_reason=self.finish_reason,
+            output_tokens=self.output_tokens,
+        )
 
 
 def _response(items: list[dict[str, object]]) -> str:
@@ -81,7 +87,10 @@ def test_batch_generator_calls_runtime_once_and_maps_response() -> None:
 
     assert result == {(1, "첫번째"): "첫번째 이유", (2, "두번째"): "두번째 이유"}
     assert len(runtime.calls) == 1
-    assert runtime.calls[0]["max_output_tokens"] == 2048
+    assert runtime.calls[0]["max_output_tokens"] == 4096
+    response_format = runtime.calls[0]["response_format"]
+    assert response_format.response_mime_type == "application/json"
+    assert response_format.response_schema["required"] == ["items"]
 
 
 def test_batch_parser_accepts_one_json_code_fence() -> None:
@@ -96,6 +105,58 @@ def test_batch_parser_accepts_one_json_code_fence() -> None:
     result = parse_batch_reason_response(response, items)
 
     assert len(result) == 2
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '설명입니다. {"items": []}',
+        '{"items": []} 설명입니다.',
+    ],
+)
+def test_batch_parser_rejects_text_around_json(response: str) -> None:
+    with pytest.raises(BatchResponseError, match="malformed_json"):
+        parse_batch_reason_response(response, _items())
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        '{"items": [{"rank": 1, "keyword": "첫번째", "reason": "이유"}',
+        '{"items": [{"rank": 1, "keyword": "첫번째", "reason": "이유}]',
+        '{"items": [{"rank": 1, "keyword": "첫번째", "reason": "이유"}',
+    ],
+)
+def test_batch_parser_classifies_truncated_json(response: str) -> None:
+    with pytest.raises(BatchResponseError, match="truncated_json"):
+        parse_batch_reason_response(response, _items())
+
+
+def test_batch_parser_classifies_max_tokens_separately() -> None:
+    with pytest.raises(BatchResponseError, match="truncated_json"):
+        parse_batch_reason_response(
+            '{"items": [{"rank": 1, "keyword": "첫번째", "reason": "이유"}',
+            _items(),
+            finish_reason="MAX_TOKENS",
+            output_tokens=4096,
+        )
+
+
+def test_batch_parser_accepts_ten_long_reasons() -> None:
+    items = [
+        (_trend(rank, f"검색어-{rank}"), [_article(f"검색어-{rank}")])
+        for rank in range(1, 11)
+    ]
+    response = _response(
+        [
+            {"rank": trend.rank, "keyword": trend.keyword, "reason": "가" * 300}
+            for trend, _ in items
+        ]
+    )
+
+    result = parse_batch_reason_response(response, items)
+
+    assert len(result) == 10
 
 
 @pytest.mark.parametrize(

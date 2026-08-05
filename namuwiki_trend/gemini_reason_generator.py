@@ -1,10 +1,11 @@
 """LlmRuntime을 사용한 나무위키 실시간 검색어 등재 이유 생성."""
 
 import json
+import logging
 from collections.abc import Mapping, Sequence
 from math import ceil
 
-from llm_runtime.models import KeyProfile, LlmJob
+from llm_runtime.models import KeyProfile, LlmJob, LlmResponseFormat
 from llm_runtime.runtime import LlmRuntime
 from namuwiki_trend.models import NewsArticle, TrendItem
 
@@ -12,7 +13,28 @@ MAX_REASON_LENGTH = 300
 MAX_PROMPT_LENGTH = 12_000
 INSUFFICIENT_EVIDENCE_REASON = "제공된 기사만으로는 정확한 이유를 확인하기 어렵다."
 
-BATCH_MAX_OUTPUT_TOKENS = 2048
+BATCH_MAX_OUTPUT_TOKENS = 4096
+LOGGER = logging.getLogger(__name__)
+NAMUWIKI_RESPONSE_SCHEMA: dict[str, object] = {
+    "type": "OBJECT",
+    "properties": {
+        "items": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "rank": {"type": "INTEGER"},
+                    "keyword": {"type": "STRING"},
+                    "reason": {"type": "STRING"},
+                },
+                "required": ["rank", "keyword", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["items"],
+    "additionalProperties": False,
+}
 
 
 class BatchAnalysisError(ValueError):
@@ -95,6 +117,7 @@ def build_batch_reason_prompt(items: Sequence[BatchInput]) -> str:
         "- 입력된 rank와 keyword를 그대로 유지한다.\n"
         "- 입력에 없는 keyword나 rank를 만들지 않는다.\n"
         "- 각 대상마다 한국어 2~3문장으로 작성한다.\n"
+        "- 각 reason은 300자 이하로 작성한다.\n"
         "- 제공된 뉴스 근거 안에서만 설명한다.\n"
         "- 사실 확인이 불가능한 원인을 단정하지 않는다.\n"
         "- 광고성 문구와 투자 조언을 포함하지 않는다.\n\n"
@@ -111,25 +134,97 @@ def build_batch_reason_prompt(items: Sequence[BatchInput]) -> str:
     return prompt
 
 
-def _strip_json_code_fence(text: str) -> str:
+def _strip_json_code_fence(text: str) -> tuple[str, bool]:
     """응답 전체를 감싼 단일 JSON code fence만 제거한다."""
     stripped = text.strip()
     if not stripped.startswith("```"):
-        return stripped
+        return stripped, False
     lines = stripped.splitlines()
     if len(lines) < 3 or lines[0] not in {"```", "```json"} or lines[-1] != "```":
         raise BatchResponseError("malformed_code_fence")
-    return "\n".join(lines[1:-1]).strip()
+    return "\n".join(lines[1:-1]).strip(), True
 
 
-def parse_batch_reason_response(text: str, items: Sequence[BatchInput]) -> dict[BatchKey, str]:
+def _finish_reason_name(finish_reason: object) -> str | None:
+    """SDK enum 또는 문자열 finish reason을 안전한 이름으로 변환한다."""
+    if finish_reason is None:
+        return None
+    value = getattr(finish_reason, "value", finish_reason)
+    return value if isinstance(value, str) else type(finish_reason).__name__
+
+
+def _log_response_diagnostics(
+    text: str,
+    *,
+    finish_reason: object,
+    output_tokens: int | None,
+    has_json_fence: bool,
+) -> tuple[str, bool, bool]:
+    """응답 본문을 노출하지 않고 JSON 경계 진단 정보를 기록한다."""
+    stripped = text.strip()
+    first = stripped[0] if stripped else None
+    last = stripped[-1] if stripped else None
+    starts_json = stripped.startswith("{")
+    ends_json = stripped.endswith("}")
+    LOGGER.debug(
+        "Namuwiki batch response: chars=%s first=%r last=%r has_json_fence=%s "
+        "starts_json=%s ends_json=%s finish_reason=%s output_tokens=%s",
+        len(text),
+        first,
+        last,
+        has_json_fence,
+        starts_json,
+        ends_json,
+        _finish_reason_name(finish_reason),
+        output_tokens,
+    )
+    return stripped, starts_json, ends_json
+
+
+def parse_batch_reason_response(
+    text: str,
+    items: Sequence[BatchInput],
+    *,
+    finish_reason: object = None,
+    output_tokens: int | None = None,
+) -> dict[BatchKey, str]:
     """Strict JSON Batch 응답을 입력 rank와 keyword에 매핑한다."""
     validated = _validate_batch_inputs(items)
     if not isinstance(text, str):
         raise BatchResponseError("response_text_not_string")
+    stripped = text.strip()
+    has_json_fence = stripped.startswith("```")
+    if _finish_reason_name(finish_reason) == "MAX_TOKENS":
+        _log_response_diagnostics(
+            text,
+            finish_reason=finish_reason,
+            output_tokens=output_tokens,
+            has_json_fence=has_json_fence,
+        )
+        raise BatchResponseError("truncated_json")
     try:
-        payload = json.loads(_strip_json_code_fence(text))
+        json_text, has_json_fence = _strip_json_code_fence(text)
+        _, starts_json, ends_json = _log_response_diagnostics(
+            json_text,
+            finish_reason=finish_reason,
+            output_tokens=output_tokens,
+            has_json_fence=has_json_fence,
+        )
+        payload = json.loads(json_text)
+    except BatchResponseError:
+        raise
     except json.JSONDecodeError as exc:
+        LOGGER.debug(
+            "Namuwiki batch JSON decode failure: line=%s column=%s position=%s",
+            exc.lineno,
+            exc.colno,
+            exc.pos,
+        )
+        if starts_json and (
+            exc.pos >= len(json_text.rstrip()) - 1
+            or exc.msg == "Unterminated string starting at"
+        ):
+            raise BatchResponseError("truncated_json") from exc
         raise BatchResponseError("malformed_json") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
         raise BatchResponseError("items_array_required")
@@ -279,8 +374,17 @@ class GeminiReasonGenerator:
             prompt=prompt,
             estimated_input_tokens=self.estimate_input_tokens(prompt),
             max_output_tokens=BATCH_MAX_OUTPUT_TOKENS,
+            response_format=LlmResponseFormat(
+                response_mime_type="application/json",
+                response_schema=NAMUWIKI_RESPONSE_SCHEMA,
+            ),
         )
         response_text = getattr(response, "text", None)
         if not isinstance(response_text, str):
             raise BatchResponseError("response_text_missing")
-        return parse_batch_reason_response(response_text, validated)
+        return parse_batch_reason_response(
+            response_text,
+            validated,
+            finish_reason=getattr(response, "finish_reason", None),
+            output_tokens=getattr(response, "output_tokens", None),
+        )
