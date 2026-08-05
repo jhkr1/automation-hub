@@ -69,6 +69,18 @@ flowchart TD
 - 외부 시스템과 생성기는 가능한 경우 생성자 주입으로 교체 가능하게 합니다.
 - Root의 Database 코드는 현재 완전히 공통화된 Domain 계층으로 간주하지 않습니다.
 
+## Current Implementation Status
+
+| Component | Status |
+|---|---|
+| Google Finance Collect | Complete |
+| Namuwiki Snapshot | Complete |
+| Shared LLM Runtime | Complete |
+| Local Quota Ledger | Complete |
+| Namuwiki Batch | Complete |
+| Google Finance Batch | Planned |
+| Dashboard LLM Insights | Planned |
+
 ## Testing Strategy
 
 기본 `pytest` 실행은 외부 네트워크, 실제 API와 실제 브라우저에 의존하지 않는 테스트를 우선합니다. Collector·Provider·SDK는 Fake 또는 Mock으로 대체하고, 파서와 변환은 격리된 입력으로 검증합니다.
@@ -118,6 +130,10 @@ flowchart TD
 - [Namuwiki README](packages/namuwiki_trend/README.md): Namuwiki 실행 방법과 현재 기능입니다.
 - [Namuwiki Architecture](packages/namuwiki_trend/architecture.md): Namuwiki 내부 설계 Reference입니다.
 - [Decision Records](decisions/README.md): 장기 설계 선택의 근거입니다.
+- [LLM Runtime Operations](operations/llm_runtime.md): 공통 Runtime, quota, retry와 Batch 운영 계약입니다.
+- [ADR-0007: Shared LLM Runtime](adr/ADR-0007-llm-runtime.md): 공통 LLM Runtime 도입 결정입니다.
+- [ADR-0008: Namuwiki Batch](adr/ADR-0008-batch-analysis.md): Namuwiki Batch 적용 결정입니다.
+- [ADR-0009: Gemini Profiles](adr/ADR-0009-gemini-profile.md): Production/Test profile 분리 결정입니다.
 - [Development Log](development/DEV_LOG.md): 구현과 검증의 시간순 기록입니다.
 - [Architecture Handbook](handbook/README.md): Repository 사례를 통한 학습 경로입니다.
 

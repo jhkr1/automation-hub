@@ -57,8 +57,9 @@ Package README는 실행 방법과 현재 기능의 기준 문서입니다. Pack
 | Understand the repository architecture | [Root Architecture](docs/architecture.md) |
 | Explore the code | [CODEBASE_GUIDE.md](CODEBASE_GUIDE.md) |
 | Prepare an operating environment | [Operations](docs/operations/README.md) |
+| Operate the shared LLM Runtime | [LLM Runtime Operations](docs/operations/llm_runtime.md) |
 | Learn architecture from this project | [Architecture Handbook](docs/handbook/README.md) |
-| Read design decisions | [Decision Records](docs/decisions/README.md) |
+| Read design decisions | [Decision Records](docs/decisions/README.md) and [LLM ADRs](docs/adr/ADR-0007-llm-runtime.md) |
 | Read development history | [DEV_LOG.md](docs/development/DEV_LOG.md) |
 
 ```mermaid
@@ -92,13 +93,22 @@ python scripts/verify.py
 
 이 명령은 Ruff, pytest, compileall과 `git diff --check`를 실행합니다. 외부 네트워크, 실제 API 또는 MySQL이 필요한 검증은 해당 Package와 [Operations](docs/operations/README.md)의 조건을 따릅니다.
 
-## Current Features
+## Implemented
 
 - `namuwiki_trend`: Playwright 기반 Top 10 수집, rank 보존, 뉴스·LLM enrichment, JSON·CSV·DB snapshot, Daily Trend 조회
 - `google_finance`: 단일 종목 Quote 수집, `StockPrice` 변환, MySQL snapshot, Movement Detection, Google News·Gemini 분석, `STOCK_SYMBOLS` Watchlist
 - 공통 범위 밖: Scheduler, 분석 결과 JSON·DB 저장, threshold와 상대 변동률
 
 세부 구현 상태, 제한사항과 실행 계약은 각 Package README를 기준으로 합니다. 개발 과정의 문제와 검증 기록은 [DEV_LOG](docs/development/DEV_LOG.md)에서 확인합니다.
+
+## Planned
+
+- Google Finance Batch analysis
+- Dashboard LLM Insights
+- Multi-host Quota Ledger
+- Additional LLM Providers
+
+위 항목은 현재 구현 범위가 아니며, 실행 가능한 기능으로 간주하면 안 됩니다.
 
 ## Contributing / Code Exploration
 
