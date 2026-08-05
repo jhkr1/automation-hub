@@ -45,14 +45,27 @@ DASHBOARD_CSS = f"""
     --automation-card-radius: {TOKENS.card_radius}px;
     --automation-card-padding: {TOKENS.card_padding}px;
     --automation-section-gap: {TOKENS.section_gap}px;
+    --automation-card-background: var(--secondary-background-color,
+        var(--background-color, transparent));
+    --automation-card-text: var(--text-color, inherit);
+    --automation-card-muted-text: var(--text-color, inherit);
+    --automation-card-border: var(--secondary-background-color, var(--text-color, currentColor));
 }}
 
 [data-testid="stMetric"] {{
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--automation-card-border);
     border-radius: var(--automation-card-radius);
     padding: var(--automation-card-padding);
-    background: #FFFFFF;
+    background: var(--automation-card-background);
+    color: var(--automation-card-text);
     min-height: {TOKENS.card_min_height}px;
+}}
+
+[data-testid="stMetric"] label,
+[data-testid="stMetric"] [data-testid="stMetricLabel"],
+[data-testid="stMetric"] [data-testid="stMetricValue"],
+[data-testid="stMetric"] [data-testid="stMetricDelta"] {{
+    color: var(--automation-card-text) !important;
 }}
 
 [data-testid="stMetricValue"] {{
@@ -61,10 +74,16 @@ DASHBOARD_CSS = f"""
 
 [data-testid="stDataFrame"] {{
     border-radius: var(--automation-card-radius);
+    color: var(--automation-card-text);
 }}
 
 [data-testid="stExpander"] {{
     border-radius: var(--automation-card-radius);
+    color: var(--automation-card-text);
+}}
+
+[data-testid="stCaptionContainer"] {{
+    color: var(--automation-card-muted-text);
 }}
 </style>
 """

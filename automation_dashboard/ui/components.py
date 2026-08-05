@@ -142,7 +142,19 @@ def render_status_badge(
     color = STATUS_COLORS.get(status, STATUS_COLORS["Unavailable"])
     safe_status = escape(status)
     container.markdown(
-        f'<span style="color:{color};font-weight:600">{safe_status}</span>',
+        (
+            '<span '
+            'style="'
+            'color:var(--text-color);'
+            'background-color:var(--secondary-background-color);'
+            f"border:1px solid {color};"
+            'border-radius:999px;'
+            'display:inline-block;'
+            'font-weight:600;'
+            'padding:2px 8px;'
+            '">'
+            f"{safe_status}</span>"
+        ),
         unsafe_allow_html=True,
     )
     if detail:

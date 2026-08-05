@@ -18,6 +18,31 @@ def test_dashboard_tokens_define_shared_desktop_and_mobile_values() -> None:
     assert "stMetric" in DASHBOARD_CSS
 
 
+def test_dashboard_css_uses_streamlit_theme_variables_for_surfaces_and_text() -> None:
+    """Cards and metric text follow both Streamlit light and dark themes."""
+    assert "var(--background-color" in DASHBOARD_CSS
+    assert "var(--secondary-background-color" in DASHBOARD_CSS
+    assert "var(--text-color" in DASHBOARD_CSS
+    assert "background: #FFFFFF" not in DASHBOARD_CSS
+    assert "background: #F8FAFC" not in DASHBOARD_CSS
+
+
+def test_status_badge_uses_theme_text_and_status_border(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Status meaning remains colored while its text follows the active theme."""
+    rendered: list[str] = []
+
+    class Container:
+        def markdown(self, value: str, **kwargs: object) -> None:
+            rendered.append(value)
+
+        def caption(self, value: str) -> None:
+            rendered.append(value)
+
+    components.render_status_badge("Healthy", container=Container())
+
+    assert rendered
+    assert "var(--text-color)" in rendered[0]
+    assert "border:1px solid #188038" in rendered[0]
 
 
 def test_status_colors_have_textual_state_contract() -> None:
