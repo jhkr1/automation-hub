@@ -37,7 +37,7 @@ Structured Output Batch 요청으로 보내므로 실행당 Gemini 호출은 최
 
 ```cron
 # 매시간 현재 가격을 수집하고 Snapshot을 저장한다.
-7 * * * * /srv/automation-hub/run_google_finance.sh --collect
+0 * * * * /home/kstec/projects/automation-hub/run_google_finance.sh --collect
 
 # quota reset 이후 여유를 두고 하루 한 번 저장된 Snapshot을 분석한다.
 10 18 * * * /srv/automation-hub/run_google_finance.sh --analyze --key-profile production
@@ -50,8 +50,10 @@ Structured Output Batch 요청으로 보내므로 실행당 Gemini 호출은 최
 기본 호출량이 된다. 뉴스가 없는 Symbol은 Batch에서 제외하고 기존 근거 부족 결과를
 사용한다. Batch Provider 또는 Parser가 실패하면 전체 Batch 대상이 실패하며 자동 개별
 fallback 호출은 하지 않는다. 분석 결과는 CLI 출력과 profile별 JSON artifact로 보존한다.
-Dashboard Reader 연결과 화면 표시는 후속 Sprint 범위다. cron 등록 전에는 `test` profile로
-수동 smoke test를 수행한다.
+Dashboard Reader는 production artifact를 읽고 Google Finance 페이지의 선택된 현재
+Watchlist Symbol에 대한 Insight를 표시한다. 과거 DB Snapshot에만 남아 있는 AAPL 같은
+Symbol은 selector에서 제외하며, artifact의 Symbol과 선택값은 exact canonical match만
+사용한다. cron 등록 전에는 `test` profile로 수동 smoke test를 수행한다.
 
 ## Watchlist Batch 계약
 
@@ -98,8 +100,10 @@ Batch Parser/Provider 실패, local budget, daily quota처럼 최종 결과에 �
 기존 artifact를 덮어쓰지 않는다. API key, Prompt, raw Gemini response, 뉴스 본문과 전체
 기사 객체는 저장하지 않고 필요한 `news_count`만 저장한다.
 
-현재 Dashboard는 이 artifact를 아직 읽지 않으며 Planned 상태를 유지한다. Dashboard Reader
-연결 후 production cron 등록을 권장한다.
+Dashboard는 이 artifact를 read-only로 읽는다. CLI는 분석 실행과 종료 코드를 담당하고,
+artifact는 profile별 결과 보존을 담당하며, Dashboard는 artifact를 표시하는 역할만
+담당한다. artifact에 선택된 Symbol이 없으면 다른 Symbol의 Summary로 대체하지 않고
+`No Insight for Selected Symbol` 상태를 표시한다.
 
 ## 로그
 

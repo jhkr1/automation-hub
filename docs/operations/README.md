@@ -16,6 +16,7 @@ Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여
 
 - [`namuwiki_trend 운영 절차`](namuwiki_trend.md): Snapshot, MySQL, 전체 enrichment와 Wrapper
 - [`google_finance 운영 절차`](google_finance.md): Watchlist 수집·분석 Wrapper와 quota 고려사항
+- [`Cron 운영 가이드`](cron.md): Job 의존성, 권장 Schedule과 WSL 운영 주의사항
 
 ## 공통 종료 코드
 

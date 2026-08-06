@@ -78,8 +78,8 @@ flowchart TD
 | Shared LLM Runtime | Complete |
 | Local Quota Ledger | Complete |
 | Namuwiki Batch | Complete |
-| Google Finance Batch | Planned |
-| Dashboard LLM Insights | Planned |
+| Google Finance Batch | Complete |
+| Dashboard LLM Insights | Complete |
 
 ## Testing Strategy
 
