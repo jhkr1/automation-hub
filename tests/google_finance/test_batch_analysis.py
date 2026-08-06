@@ -142,6 +142,8 @@ def test_prompt_distinguishes_snapshot_and_google_finance_changes() -> None:
     assert "Snapshot change_percent" in prompt
     assert "Google Finance change_percent" in prompt
     assert "같은 의미로" in prompt
+    assert "최근 두 차례 자동 수집 시점 사이에는" in prompt
+    assert "오늘 또는 전일 대비" in prompt
     assert "매수" in prompt and "매도" in prompt
 
 

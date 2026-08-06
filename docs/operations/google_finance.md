@@ -49,9 +49,9 @@ Structured Output Batch 요청으로 보내므로 실행당 Gemini 호출은 최
 않는다. 정상 운영 기준으로 Namuwiki Batch 1회와 Google Finance Batch 1회가 하루
 기본 호출량이 된다. 뉴스가 없는 Symbol은 Batch에서 제외하고 기존 근거 부족 결과를
 사용한다. Batch Provider 또는 Parser가 실패하면 전체 Batch 대상이 실패하며 자동 개별
-fallback 호출은 하지 않는다. 분석 결과는 현재 CLI 출력만 제공하며 JSON 저장과
-Dashboard 표시는 후속 Sprint 범위다. cron 등록 전에는 `test` profile로 수동 smoke
-test를 수행한다.
+fallback 호출은 하지 않는다. 분석 결과는 CLI 출력과 profile별 JSON artifact로 보존한다.
+Dashboard Reader 연결과 화면 표시는 후속 Sprint 범위다. cron 등록 전에는 `test` profile로
+수동 smoke test를 수행한다.
 
 ## Watchlist Batch 계약
 
@@ -66,12 +66,40 @@ Prompt에는 두 종류의 변동률을 구분해 전달한다.
 | Snapshot change | 최근 두 저장 Snapshot 사이의 가격 변화 |
 | Google Finance change | Google Finance 페이지가 제공한 자체 기준 변동률 |
 
+Summary에서도 두 기준을 섞지 않는다. Google Finance change를 오늘 또는 전일 대비로
+단정하지 않으며, Snapshot movement가 변하지 않은 경우에는
+`최근 두 차례 자동 수집 시점 사이에는 추가 가격 변동이 없었습니다`처럼 저장된 두
+수집 시점을 명시한다. 가격이 변한 경우에도 최근 두 차례 자동 수집 사이의 가격 변화와
+방향으로 설명한다. 이는 Google Finance 페이지의 표시 변동률과 다른 기준일 수 있다.
+
 Batch JSON은 입력 Symbol과 정확히 일치해야 한다. Unknown, duplicate, missing Symbol,
 빈 Summary, 300자 초과 Summary와 잘린 JSON은 전체 Batch 오류로 처리한다. 기존 Watchlist
 순서는 복원하며, Batch 오류 뒤 개별 Gemini 요청은 추가하지 않는다.
 
-Google Finance LLM Summary는 현재 CLI 출력만 지원한다. Google Finance artifact writer와
-Dashboard Insight는 아직 구현되지 않았다.
+## JSON Artifact
+
+분석이 모든 Symbol에 대해 정상적으로 결과를 구성하면 다음 경로에 artifact를 원자적으로
+저장한다.
+
+| Profile | 경로 |
+|---|---|
+| Production | `output/google_finance_insights.json` |
+| Test | `output/test/google_finance_insights.json` |
+
+두 profile은 CLI에서 선택한 `KeyProfile`로 직접 구분하며 환경변수로 다시 추론하지 않는다.
+artifact에는 `schema_version=1`, UTC timezone-aware `generated_at`, profile, model과
+Watchlist 입력 순서를 보존한 `items`가 포함된다. Decimal 가격과 변동값은 정밀도 손실을
+피하기 위해 문자열로 저장한다. 상태가 `SUCCESS`가 아닌 항목도 Symbol과 상태를 보존하며,
+사용할 수 없는 필드는 `null`이다.
+
+저장은 동일 디렉터리의 임시 파일에 기록하고 flush, fsync, atomic replace 순서로 수행하며
+파일 권한은 `0600`이다. 저장 실패 시 임시 파일을 정리하고 기존 정상 artifact를 보존한다.
+Batch Parser/Provider 실패, local budget, daily quota처럼 최종 결과에 실패 상태가 있으면
+기존 artifact를 덮어쓰지 않는다. API key, Prompt, raw Gemini response, 뉴스 본문과 전체
+기사 객체는 저장하지 않고 필요한 `news_count`만 저장한다.
+
+현재 Dashboard는 이 artifact를 아직 읽지 않으며 Planned 상태를 유지한다. Dashboard Reader
+연결 후 production cron 등록을 권장한다.
 
 ## 로그
 

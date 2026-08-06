@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,6 +11,11 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from google_finance.config import Settings
+from google_finance.insight_artifact import (
+    JsonGoogleFinanceInsightStorage,
+    artifact_path,
+    build_insight_artifact,
+)
 from google_finance.models import StockInsight
 from google_finance.movement_application import MovementUnavailable
 from google_finance.watchlist_application import (
@@ -23,6 +29,7 @@ from llm_runtime.models import KeyProfile
 from llm_runtime.providers.gemini import GeminiProvider
 from llm_runtime.quota import LocalFileQuotaLedger
 from llm_runtime.runtime import LlmRuntime
+from llm_runtime.settings import DEFAULT_GEMINI_MODEL
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -85,7 +92,28 @@ def _run_analyze(
         runtime=build_llm_runtime(),
         profile=profile,
     )
-    return analyze_stored_quotes_batch(storage, provider, generator, list(symbols))
+    results = analyze_stored_quotes_batch(storage, provider, generator, list(symbols))
+    _save_analysis_artifact(results, profile)
+    return results
+
+
+def _save_analysis_artifact(
+    results: list[WatchlistAnalysisResult],
+    profile: KeyProfile,
+) -> None:
+    """Save only a complete result set, preserving the prior artifact on failure."""
+    if any(
+        result.status
+        in {
+            WatchlistAnalysisStatus.FAILED,
+            WatchlistAnalysisStatus.ANALYSIS_UNAVAILABLE,
+        }
+        for result in results
+    ):
+        return
+    model = os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip()
+    artifact = build_insight_artifact(results, profile=profile, model=model)
+    JsonGoogleFinanceInsightStorage().save(artifact, artifact_path(profile))
 
 
 def _print_collect_result(result: WatchlistCollectResult) -> None:
