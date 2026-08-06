@@ -32,8 +32,8 @@ Gemini를 사용하지 않으며 cron은 production profile만 사용한다.
 ## Cron 권장 예시
 
 Google Finance는 수집과 분석을 분리한다. 수집은 Snapshot을 쌓고, 분석은 저장된 최신
-두 Snapshot과 News를 사용한다. Watchlist가 4종목인 경우 분석은 실행당 최대 4회의
-Gemini 호출을 발생시킬 수 있으므로 무료 quota를 고려해 하루 1회부터 시작한다.
+두 Snapshot과 News를 사용한다. Watchlist 분석은 분석 가능한 모든 Symbol을 하나의
+Structured Output Batch 요청으로 보내므로 실행당 Gemini 호출은 최대 1회다.
 
 ```cron
 # 매시간 현재 가격을 수집하고 Snapshot을 저장한다.
@@ -46,8 +46,32 @@ Gemini 호출을 발생시킬 수 있으므로 무료 quota를 고려해 하루 
 첫 분석 시점에 동일 종목의 Snapshot이 두 개 미만이면 `MOVEMENT_UNAVAILABLE`이
 정상적으로 반환된다. Gemini 무료 quota가 20 requests/day인 환경에서는 다른 Gemini
 사용량과 Namuwiki 실행을 합산해야 하며, quota가 확정되기 전에는 분석 주기를 늘리지
-않는다. 분석 결과는 현재 CLI 출력만 제공하며 JSON 저장과 Dashboard 표시는 후속 Sprint
-범위다. cron 등록 전에는 `test` profile로 수동 smoke test를 수행한다.
+않는다. 정상 운영 기준으로 Namuwiki Batch 1회와 Google Finance Batch 1회가 하루
+기본 호출량이 된다. 뉴스가 없는 Symbol은 Batch에서 제외하고 기존 근거 부족 결과를
+사용한다. Batch Provider 또는 Parser가 실패하면 전체 Batch 대상이 실패하며 자동 개별
+fallback 호출은 하지 않는다. 분석 결과는 현재 CLI 출력만 제공하며 JSON 저장과
+Dashboard 표시는 후속 Sprint 범위다. cron 등록 전에는 `test` profile로 수동 smoke
+test를 수행한다.
+
+## Watchlist Batch 계약
+
+분석 대상은 저장된 Snapshot이 두 개 이상이고 Movement를 계산할 수 있으며 회사명·가격·
+통화와 뉴스가 모두 있는 Symbol이다. Snapshot이 없거나 두 개 미만이면
+`MOVEMENT_UNAVAILABLE`, 뉴스가 없으면 Gemini 호출 없이 근거 부족 Summary를 반환한다.
+
+Prompt에는 두 종류의 변동률을 구분해 전달한다.
+
+| 값 | 의미 |
+|---|---|
+| Snapshot change | 최근 두 저장 Snapshot 사이의 가격 변화 |
+| Google Finance change | Google Finance 페이지가 제공한 자체 기준 변동률 |
+
+Batch JSON은 입력 Symbol과 정확히 일치해야 한다. Unknown, duplicate, missing Symbol,
+빈 Summary, 300자 초과 Summary와 잘린 JSON은 전체 Batch 오류로 처리한다. 기존 Watchlist
+순서는 복원하며, Batch 오류 뒤 개별 Gemini 요청은 추가하지 않는다.
+
+Google Finance LLM Summary는 현재 CLI 출력만 지원한다. Google Finance artifact writer와
+Dashboard Insight는 아직 구현되지 않았다.
 
 ## 로그
 

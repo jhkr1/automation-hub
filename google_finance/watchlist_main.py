@@ -17,7 +17,6 @@ from google_finance.watchlist_application import (
     WatchlistAnalysisStatus,
     WatchlistCollectResult,
     WatchlistCollectStatus,
-    analyze_watchlist,
     collect_watchlist,
 )
 from llm_runtime.models import KeyProfile
@@ -74,23 +73,19 @@ def _run_analyze(
     symbols: Sequence[str],
     profile: KeyProfile,
 ) -> list[WatchlistAnalysisResult]:
-    """Compose existing storage, news, generator, and analysis application APIs."""
-    from google_finance.analysis_application import analyze_stored_quote
-    from google_finance.analysis_generator import GeminiStockInsightGenerator
+    """Compose the Watchlist Batch analysis application and shared Runtime."""
+    from google_finance.analysis_application import analyze_stored_quotes_batch
+    from google_finance.batch_analysis import GeminiStockInsightBatchGenerator
     from google_finance.news import GoogleFinanceNewsProvider
     from google_finance.storage import StockQuoteStorage
 
     storage = StockQuoteStorage()
     provider = GoogleFinanceNewsProvider()
-    generator = GeminiStockInsightGenerator(
+    generator = GeminiStockInsightBatchGenerator(
         runtime=build_llm_runtime(),
         profile=profile,
     )
-
-    def analyze_one(symbol: str) -> StockInsight | MovementUnavailable:
-        return analyze_stored_quote(storage, provider, generator, symbol)
-
-    return analyze_watchlist(symbols, analyze_one)
+    return analyze_stored_quotes_batch(storage, provider, generator, list(symbols))
 
 
 def _print_collect_result(result: WatchlistCollectResult) -> None:
