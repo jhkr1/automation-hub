@@ -45,6 +45,7 @@ from automation_dashboard.ui.states import (
     freshness_state,
     render_database_error,
 )
+from google_finance.config import Settings as GoogleFinanceSettings
 
 HISTORY_LIMIT = 20
 
@@ -72,8 +73,23 @@ def _load_latest_delta(symbol: str) -> SnapshotDelta | None:
 
 @st.cache_data(ttl=60, show_spinner=False)
 def _load_insights() -> GoogleFinanceInsightReadModel:
-    """Cache the placeholder read model without reading or creating an artifact."""
+    """Cache the detached Google Finance artifact read model."""
     return read_google_finance_insights()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_watchlist_symbols() -> list[str]:
+    """Load the active Watchlist through the package Settings contract."""
+    return GoogleFinanceSettings().get_symbol_list()
+
+
+def _filter_active_quotes(
+    quotes: list[LatestQuoteRow],
+    active_symbols: list[str],
+) -> list[LatestQuoteRow]:
+    """Show only current Watchlist symbols, preserving Watchlist order."""
+    quotes_by_symbol = {quote.symbol: quote for quote in quotes}
+    return [quotes_by_symbol[symbol] for symbol in active_symbols if symbol in quotes_by_symbol]
 
 
 def _history_table_rows(history: list[PricePoint]) -> list[dict[str, object]]:
@@ -95,12 +111,39 @@ def _selected_label(symbol: str, quotes: list[LatestQuoteRow]) -> str:
     return f"{quote.name} ({symbol})"
 
 
-def _render_insights(model: GoogleFinanceInsightReadModel) -> None:
-    """Render the future insight contract without fabricating analysis data."""
+def _render_insights(model: GoogleFinanceInsightReadModel, selected_symbol: str) -> None:
+    """Render only the exact selected-symbol insight from the artifact."""
+    row = model.row_for_symbol(selected_symbol)
+    if row is None:
+        render_insight_card(
+            status="Symbol Not Analyzed",
+            headline=f"No Insight for Selected Symbol · {selected_symbol}",
+            summary="선택한 종목에 대한 분석 결과가 아직 없습니다.",
+        )
+        return
+
+    status = model.status.value if row.status == "SUCCESS" else "Unavailable"
+    evidence = " · ".join(
+        value
+        for value in (
+            f"Snapshot movement: {row.snapshot_movement}" if row.snapshot_movement else None,
+            f"Snapshot change: {row.snapshot_change_percent}%"
+            if row.snapshot_change_percent is not None
+            else None,
+            f"Google Finance change: {row.google_finance_change_percent}%"
+            if row.google_finance_change_percent is not None
+            else None,
+            f"News count: {row.news_count}" if row.news_count is not None else None,
+            f"Data age: {model.age}" if model.age is not None else None,
+        )
+        if value is not None
+    )
     render_insight_card(
-        status=model.status.value,
-        headline="LLM Stock Insight",
-        summary=model.message,
+        status=status,
+        headline=f"LLM Stock Insight · {row.company_name or selected_symbol}",
+        summary=row.summary or "선택한 종목의 분석 결과를 사용할 수 없습니다.",
+        evidence=evidence or None,
+        generated_at=row.analyzed_at_kst,
     )
 
 
@@ -186,20 +229,20 @@ def main() -> None:
     apply_dashboard_theme()
     render_sidebar_context()
     try:
-        quotes = _load_latest_quotes()
-    except (DashboardConfigurationError, DashboardDatabaseError):
+        quotes = _filter_active_quotes(_load_latest_quotes(), _load_watchlist_symbols())
+    except (DashboardConfigurationError, DashboardDatabaseError, ValueError):
         render_page_hero(
             "Google Finance",
-            "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+            "현재 Watchlist와 저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
             status="Unavailable",
         )
-        render_database_error()
+        render_empty_state("현재 Google Finance Watchlist 설정을 확인할 수 없습니다.")
         return
 
     if not quotes:
         render_page_hero(
             "Google Finance",
-            "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+            "현재 Watchlist와 저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
             status="No Data",
         )
         render_empty_state(
@@ -214,7 +257,7 @@ def main() -> None:
     )
     render_page_hero(
         "Google Finance",
-        "저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
+        "현재 Watchlist와 저장된 가격 Snapshot을 조회하는 Read-only 화면입니다.",
         primary_entity=f"{default_quote.name} ({default_quote.symbol})",
         status=default_state.label,
         last_updated=default_quote.collected_at,
@@ -243,7 +286,7 @@ def main() -> None:
     _render_price_chart(selected_symbol, selected_quote, history)
 
     render_section_title("AI Insight")
-    _render_insights(_load_insights())
+    _render_insights(_load_insights(), selected_symbol)
 
     render_section_title("Snapshot History", "최신 수집 시각부터 표시합니다.")
     history_frame = pd.DataFrame(_history_table_rows(history))
