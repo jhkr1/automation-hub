@@ -88,10 +88,9 @@ test artifact 분리는 다음 Batch Sprint의 범위다. Snapshot만 수집하�
 예시:
 
 ```cron
-# 저장소 경로는 실제 서버 경로로 바꾼다.
-CRON_TZ=Asia/Seoul
-17 */2 * * * /srv/automation-hub/run_namuwiki_snapshot.sh
-30 18 * * * /srv/automation-hub/run_namuwiki_trend.sh
+# cron host local timezone 기준 예시
+17 */2 * * * /home/kstec/projects/automation-hub/run_namuwiki_snapshot.sh
+30 8 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh --key-profile production
 ```
 
 현재 cron 간격과 운영 환경은 Wrapper 및 실제 crontab 설정을 확인해야 한다. 이 문서는

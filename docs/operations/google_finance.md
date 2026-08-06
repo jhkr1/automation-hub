@@ -40,7 +40,7 @@ Structured Output Batch 요청으로 보내므로 실행당 Gemini 호출은 최
 0 * * * * /home/kstec/projects/automation-hub/run_google_finance.sh --collect
 
 # quota reset 이후 여유를 두고 하루 한 번 저장된 Snapshot을 분석한다.
-10 18 * * * /srv/automation-hub/run_google_finance.sh --analyze --key-profile production
+10 8 * * * /home/kstec/projects/automation-hub/run_google_finance.sh --analyze --key-profile production
 ```
 
 첫 분석 시점에 동일 종목의 Snapshot이 두 개 미만이면 `MOVEMENT_UNAVAILABLE`이

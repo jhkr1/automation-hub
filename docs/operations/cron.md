@@ -27,27 +27,31 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Namuwiki Snapshot: 두 시간마다 17분
 17 */2 * * * /home/kstec/projects/automation-hub/run_namuwiki_snapshot.sh
 
-# Google Finance Batch 분석: 매일 18시 10분
-10 18 * * * /home/kstec/projects/automation-hub/run_google_finance.sh --analyze --key-profile production
+# Google Finance Batch 분석: 매일 08시 10분
+10 8 * * * /home/kstec/projects/automation-hub/run_google_finance.sh --analyze --key-profile production
 
-# Namuwiki Trend Batch: 매일 18시 30분
-30 18 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh --key-profile production
+# Namuwiki Trend Batch: 매일 08시 30분
+30 8 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh --key-profile production
 ```
 
-Google Finance collect가 먼저 DB에 Snapshot을 저장하고, analyze는 저장된 Snapshot을
-읽는다. 따라서 두 작업은 같은 시각에 실행하지 않는다. Namuwiki Snapshot도 trend
-enrichment보다 먼저 실행되어야 한다. Snapshot을 정기적으로 갱신하려면 다음 Wrapper를
-별도 cron 항목으로 추가한다.
+08:00 Google Finance collect가 먼저 DB에 Snapshot을 저장하고, 08:10 analyze는 저장된
+최신 Snapshot을 읽는다. 08:17 Namuwiki Snapshot 이후 08:30 trend가 실행된다. 따라서
+각 분석 작업은 선행 수집 작업과 같은 시각에 실행하지 않는다. Snapshot을 정기적으로
+갱신하려면 다음 Wrapper를 별도 cron 항목으로 추가한다.
 
 ```cron
 # Namuwiki Snapshot: 두 시간마다 17분
 17 */2 * * * /home/kstec/projects/automation-hub/run_namuwiki_snapshot.sh
 ```
 
-Google Finance collect는 정각 실행을 허용한다. 18:10 analyze는 18:00 collect가 끝난
-뒤 최신 Snapshot을 사용하고, 평균 실행 시간 기준으로 여유를 둔다. 18:30 Namuwiki
-enrichment는 Google Finance LLM 작업과 겹치지 않으며 Provider retry가 발생해도 시간적
-여유가 있다. 임의의 7분·17분 분산을 일반 원칙으로 강제하지는 않는다.
+Google Finance collect는 정각 실행을 허용한다. 08:10 analyze는 08:00 collect가 끝난
+뒤 최신 Snapshot을 사용하고 평균 실행 시간 기준으로 10분의 여유를 둔다. 08:30
+Namuwiki enrichment는 Google Finance LLM 작업과 겹치지 않으며 Provider retry가
+발생해도 시간적 여유가 있다. 출근 후 Dashboard에서 두 분석 결과를 확인하는 것이
+목적이다. 임의의 7분·17분 분산을 일반 원칙으로 강제하지는 않는다.
+
+Schedule의 시간은 cron host의 local timezone을 따른다. 운영 Host가 KST가 아니라면
+시각 변환을 확인해야 하며, cron 설정에 별도 timezone을 가정하지 않는다.
 
 분 단위의 간격은 작업 시간을 고려한 운영 여유다. 최근 로그에서 Google Finance
 Wrapper의 성공 실행은 대체로 15–52초, Namuwiki enrichment의 최근 성공 실행은 약
