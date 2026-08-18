@@ -8,7 +8,7 @@
 |---|---|
 | Runtime | Python 3.12 |
 | Layout | Flat layout Monorepo |
-| Packages | `namuwiki_trend`, `google_finance` |
+| Packages | `namuwiki_trend`, `google_finance`, `bus_monitor` |
 | Browser automation | Playwright |
 | Persistence | MySQL, SQLAlchemy, Alembic |
 | AI integration | Gemini·OpenAI 기반 Provider |
@@ -18,6 +18,7 @@
 flowchart TD
     Repository[automation-hub] --> Google[google_finance]
     Repository --> Namu[namuwiki_trend]
+    Repository --> Bus[bus_monitor]
     Repository --> Database[database]
     Repository --> Tests[tests]
     Repository --> Docs[docs]
@@ -52,8 +53,27 @@ pip install -e ".[dashboard,dev]"
 |---|---|---|---|
 | `namuwiki_trend` | Namuwiki Top 10 수집, 뉴스·LLM enrichment, JSON·DB snapshot, Daily Trend | [Package README](docs/packages/namuwiki_trend/README.md) | [Architecture](docs/packages/namuwiki_trend/architecture.md) |
 | `google_finance` | Quote 수집, 정규화, MySQL snapshot, Movement, News·Gemini 분석, Watchlist | [Package README](docs/packages/google_finance/README.md) | [Architecture](docs/packages/google_finance/architecture.md) |
+| `bus_monitor` | ODsay 경로 계획, 경기도 공식 버스 실시간 정보, MySQL snapshot, Streamlit 조회 | [Package README](docs/packages/bus_monitor/README.md) | [Code Flow](docs/packages/bus_monitor/CODE_FLOW.md) |
 
 Package README는 실행 방법과 현재 기능의 기준 문서입니다. Package 내부 설계와 책임 경계는 각 Architecture 문서에서 관리합니다.
+
+### Bus Monitor at a glance
+
+Bus Monitor는 좌표 기반 통근 target 하나의 첫 버스 구간을 ODsay로 계획하고, 경기도 공식
+버스 API로 해당 정류장을 지나는 노선과 도착정보를 확인해 MySQL snapshot으로 축적합니다.
+평일 수집은 `cron`과 `flock`으로 운영하며, Streamlit Dashboard는 저장된 결과만 읽습니다.
+
+| 역할 | 현재 기술 |
+|---|---|
+| Route planning | ODsay API |
+| Realtime enrichment | 경기도 공식 버스 API |
+| Persistence | SQLAlchemy, MySQL, Alembic |
+| Scheduling | `run_bus_monitor.sh`, cron, `flock` |
+| Presentation | Streamlit Dashboard |
+
+실행·환경변수·제한사항은 [Bus Monitor README](docs/packages/bus_monitor/README.md), 운영 절차는
+[Bus Monitor Operations](docs/operations/bus_monitor.md), 선택 근거는
+[Bus Monitor Decisions](docs/architecture/bus_monitor_decisions.md)에서 확인합니다.
 
 ## Documentation
 
@@ -105,6 +125,7 @@ python scripts/verify.py
 
 - `namuwiki_trend`: Playwright 기반 Top 10 수집, rank 보존, 뉴스·LLM enrichment, JSON·CSV·DB snapshot, Daily Trend 조회
 - `google_finance`: 단일 종목 Quote 수집, `StockPrice` 변환, MySQL snapshot, Movement Detection, Google News·Gemini 분석, `STOCK_SYMBOLS` Watchlist
+- `bus_monitor`: ODsay 첫 버스 구간과 경기도 공식 정류장 경유노선·도착정보를 검증해 target별 append-only MySQL snapshot 저장 및 Dashboard 조회
 - 공통 범위 밖: Scheduler, 분석 결과 DB 저장, threshold와 상대 변동률
 - Google Finance Batch 분석 결과 JSON artifact 저장과 Dashboard Insight 표시
 

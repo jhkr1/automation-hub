@@ -2,17 +2,18 @@
 
 > 이 문서는 `automation-hub` 전체 Repository의 공통 구조와 책임 경계를 설명하는 Canonical Architecture 문서입니다.
 
-이 문서의 범위는 Monorepo, Package Boundary, Root 공통 기반, 의존성 방향, 검증 전략과 문서 구조입니다. `google_finance`와 `namuwiki_trend` 내부의 수집·분석·저장 구현은 각 [Package Architecture](packages/)에서 관리합니다.
+이 문서의 범위는 Monorepo, Package Boundary, Root 공통 기반, 의존성 방향, 검증 전략과 문서 구조입니다. 각 Package 내부의 수집·분석·저장 구현은 [Package 문서](packages/)에서 관리합니다.
 
 ## Repository Structure
 
-`automation-hub`는 독립적인 자동화 Package 두 개와 Root 수준의 개발·검증·데이터베이스 기반을 하나의 Repository에서 관리합니다. Python 코드는 `src/`를 사용하지 않는 flat layout으로 배치되며, `pyproject.toml`은 `google_finance*`, `namuwiki_trend*`, `database*` Package를 탐색 대상으로 지정합니다.
+`automation-hub`는 독립적인 자동화 Package 세 개와 Root 수준의 개발·검증·데이터베이스 기반을 하나의 Repository에서 관리합니다. Python 코드는 `src/`를 사용하지 않는 flat layout으로 배치되며, `pyproject.toml`은 `google_finance*`, `namuwiki_trend*`, `bus_monitor*`, `database*` Package를 탐색 대상으로 지정합니다.
 
 ```mermaid
 flowchart TD
     Repository[automation-hub] --> Packages[Automation Packages]
     Packages --> Google[google_finance]
     Packages --> Namu[namuwiki_trend]
+    Packages --> Bus[bus_monitor]
     Repository --> Database[database]
     Repository --> Tests[tests]
     Repository --> Docs[docs]
@@ -23,6 +24,7 @@ flowchart TD
 |---|---|
 | `google_finance/` | Google Finance 자동화의 모델·Application·Provider·Storage |
 | `namuwiki_trend/` | Namuwiki 자동화의 수집·변환·Enrichment·출력 |
+| `bus_monitor/` | ODsay 경로 계획, 경기도 실시간 enrichment, target/snapshot 저장 |
 | `database/` | SQLAlchemy 기반과 현재 DB 모델·조회·저장 보조 코드 |
 | `tests/` | Package와 데이터베이스 경계의 자동화 테스트 |
 | `scripts/` | Repository 공통 검증 진입점 |
@@ -30,7 +32,7 @@ flowchart TD
 
 ## Package Boundaries
 
-각 Package는 외부 시스템과 자신의 데이터 의미, 실행 흐름을 소유합니다. `google_finance`와 `namuwiki_trend` 사이에는 현재 실제 실행 코드의 직접 import가 없습니다. 두 Package가 공유하는 것은 Root의 개발 환경, Package 탐색 설정, 검증 명령과 문서 정책입니다.
+각 Package는 외부 시스템과 자신의 데이터 의미, 실행 흐름을 소유합니다. `google_finance`, `namuwiki_trend`, `bus_monitor` 사이에는 현재 실제 실행 코드의 직접 import가 없습니다. Package가 공유하는 것은 Root의 개발 환경, Package 탐색 설정, 검증 명령과 문서 정책입니다.
 
 Package 내부의 구체적인 책임과 데이터 흐름은 다음 문서가 소유합니다.
 
@@ -38,6 +40,7 @@ Package 내부의 구체적인 책임과 데이터 흐름은 다음 문서가 �
 |---|---|---|
 | `google_finance` | [Package README](packages/google_finance/README.md) | [Package Architecture](packages/google_finance/architecture.md) |
 | `namuwiki_trend` | [Package README](packages/namuwiki_trend/README.md) | [Package Architecture](packages/namuwiki_trend/architecture.md) |
+| `bus_monitor` | [Package README](packages/bus_monitor/README.md) | [Code Flow](packages/bus_monitor/CODE_FLOW.md) |
 
 Root Architecture는 Package 내부의 Movement Rule, Watchlist, News Provider, Gemini, Collector와 Storage 구현을 복사하지 않습니다.
 
@@ -45,7 +48,7 @@ Root Architecture는 Package 내부의 Movement Rule, Watchlist, News Provider, 
 
 현재 Repository에는 `shared/` Package가 없습니다. 공통 책임을 이름만 보고 추가하지 않으며, 실제 여러 Package에서 반복되는 코드와 동일한 변경 이유가 확인될 때만 공통화를 검토합니다.
 
-Root의 `database/`는 모든 저장 구현을 추상화한 순수 공통 계층이 아닙니다. `database.base`, engine, session과 config 같은 DB 기반이 있고, `database.models`, `daily_trend_query.py`, `snapshot_save_service.py`처럼 현재 `namuwiki_trend`와 직접 연결된 코드도 함께 있습니다. Google Finance의 persistence model은 `google_finance/db_models.py`에 있으며 Root `database.base`를 사용합니다.
+Root의 `database/`는 모든 저장 구현을 추상화한 순수 공통 계층이 아닙니다. `database.base`, engine, session과 config 같은 DB 기반이 있고, `database.models`, `daily_trend_query.py`, `snapshot_save_service.py`처럼 현재 `namuwiki_trend`와 직접 연결된 코드도 함께 있습니다. Google Finance와 Bus Monitor의 persistence model은 각각 `google_finance/db_models.py`, `bus_monitor/db_models.py`에 있으며 Root `database.base`를 사용합니다.
 
 따라서 현재의 공통 기반과 Package 전용 코드가 완전히 분리되어 있다고 표현하지 않습니다. 이 경계와 변경 영향은 각 Package Architecture와 관련 [ADR](decisions/)에서 함께 확인해야 합니다.
 
@@ -80,6 +83,7 @@ flowchart TD
 | Namuwiki Batch | Complete |
 | Google Finance Batch | Complete |
 | Dashboard LLM Insights | Complete |
+| Bus Monitor route/realtime snapshot | Complete |
 
 ## Testing Strategy
 
@@ -99,6 +103,11 @@ python scripts/verify.py
 
 문서마다 하나의 Canonical 책임을 둡니다.
 
+`docs/architecture.md`는 Repository 전체의 기준 Architecture 문서입니다.
+`docs/architecture/`에는 특정 Package의 Provider·persistence 같은 선택 근거를 보관합니다.
+현재는 [Bus Monitor Decisions](architecture/bus_monitor_decisions.md) 하나만 있으며, 하위
+문서가 늘어날 때까지 별도 `README.md`나 파일 이동은 만들지 않습니다.
+
 ```mermaid
 flowchart TD
     README[Root README] --> Architecture[Root Architecture]
@@ -113,8 +122,9 @@ flowchart TD
 |---|---|
 | [Root README](../README.md) | Repository 소개, Quick Start, 문서 Navigation |
 | 이 문서 | Repository 전체 Architecture |
+| `docs/architecture/<package>_decisions.md` | Package별 기술 선택과 trade-off |
 | `docs/packages/<package>/README.md` | Package 실행 방법과 현재 기능 |
-| `docs/packages/<package>/architecture.md` | Package 내부 설계 Reference |
+| `docs/packages/<package>/architecture.md` 또는 Package별 설계 문서 | Package 내부 설계 Reference |
 | [Operations](operations/README.md) | 운영 환경과 실행 절차 |
 | [Decision Records](decisions/README.md) | 장기 설계 결정 |
 | [Development Log](development/DEV_LOG.md) | 시간순 개발 기록 |
@@ -129,6 +139,9 @@ flowchart TD
 - [Google Finance Architecture](packages/google_finance/architecture.md): Google Finance 내부 설계 Reference입니다.
 - [Namuwiki README](packages/namuwiki_trend/README.md): Namuwiki 실행 방법과 현재 기능입니다.
 - [Namuwiki Architecture](packages/namuwiki_trend/architecture.md): Namuwiki 내부 설계 Reference입니다.
+- [Bus Monitor README](packages/bus_monitor/README.md): Bus Monitor의 현재 기능과 실행 조건입니다.
+- [Bus Monitor Code Flow](packages/bus_monitor/CODE_FLOW.md): Bus Monitor의 실행·저장 흐름입니다.
+- [Bus Monitor Decisions](architecture/bus_monitor_decisions.md): Provider와 snapshot 설계의 근거입니다.
 - [Decision Records](decisions/README.md): 장기 설계 선택의 근거입니다.
 - [LLM Runtime Operations](operations/llm_runtime.md): 공통 Runtime, quota, retry와 Batch 운영 계약입니다.
 - [ADR-0007: Shared LLM Runtime](adr/ADR-0007-llm-runtime.md): 공통 LLM Runtime 도입 결정입니다.

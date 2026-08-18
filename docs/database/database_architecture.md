@@ -32,9 +32,10 @@ flowchart TD
 | Declarative Base | `database/base.py` | ORM metadata의 공통 기반 |
 | Engine | `database/engine.py`, `automation_dashboard/session.py` | 연결과 Pool을 관리 |
 | Session factory | `database/session.py` | 저장 Package가 사용할 `SessionLocal` 제공 |
-| ORM Model | `database/models.py`, `google_finance/db_models.py` | 두 Snapshot 테이블의 Python 표현 |
+| ORM Model | `database/models.py`, `google_finance/db_models.py`, `bus_monitor/db_models.py` | Namuwiki·Google Finance·Bus Monitor persistence model |
 | Namuwiki 저장 | `database/snapshot_save_service.py` | TrendSnapshot 묶음을 한 Transaction으로 저장 |
 | Google Finance 저장 | `google_finance/storage.py` | StockQuoteSnapshot 저장과 최신 조회 |
+| Bus Monitor 저장 | `bus_monitor/storage.py` | target과 route/lane/realtime snapshot을 한 transaction으로 저장 |
 | Dashboard 조회 | `automation_dashboard/queries/*.py` | ORM Row를 Dashboard DTO로 변환 |
 | Migration | `alembic/env.py`, `alembic/versions/` | DB Schema 변경 이력 관리 |
 | DB 통합 테스트 | `tests/database/` | 선택적 실제 MySQL 계약 검증 |
@@ -87,8 +88,8 @@ SessionLocal 또는 dashboard_session()
 모아두는 공통 기반이다. Model이 `Base`를 상속하면 SQLAlchemy의 `Base.metadata`에 Table,
 Column, Constraint 정보가 등록된다.
 
-`alembic/env.py`는 `database.models`와 `google_finance.db_models`를 import해 두 Model을
-metadata에 등록한 뒤 `target_metadata = Base.metadata`로 Alembic에 전달한다. 따라서
+`alembic/env.py`는 `database.models`, `google_finance.db_models`, `bus_monitor.db_models`를 import해
+Model을 metadata에 등록한 뒤 `target_metadata = Base.metadata`로 Alembic에 전달한다. 따라서
 Alembic이 Model을 발견하려면 migration 환경에서 Model module이 import되어야 한다.
 
 ORM Model은 Domain Model과 같은 것이 아니다. 예를 들어
@@ -98,8 +99,8 @@ Persistence Model이다. `from_domain()`과 `to_domain()`이 두 표현 사이�
 
 ## 실제 ORM Model 목록
 
-현재 Repository에서 `Base`를 상속하는 실제 ORM Model은 두 개다. 두 테이블 사이에 Foreign
-Key나 ORM Relationship은 없다. 각 수집 결과가 독립적인 append-only Snapshot으로 저장된다.
+현재 Repository에는 Namuwiki, Google Finance, Bus Monitor의 ORM Model이 있다. Package 사이에는
+Foreign Key나 ORM Relationship이 없고, 각 수집 결과는 독립적인 append-only Snapshot으로 저장된다.
 
 ### TrendSnapshot
 
@@ -150,9 +151,29 @@ Key나 ORM Relationship은 없다. 각 수집 결과가 독립적인 append-only
 검증한다. DB 행을 다시 Application에서 사용할 때는 `to_domain()`이 `StockPrice`로
 변환한다.
 
+### Bus Monitor tables
+
+Bus Monitor는 하나의 target이 여러 수집 시점의 route snapshot을 갖고, 각 route snapshot이
+ODsay lane과 실시간 차량 row를 갖는 부모·자식 구조입니다.
+
+| Table | 목적 |
+|---|---|
+| `bus_monitoring_targets` | 출발·도착 이름·WGS84 좌표와 enabled 상태를 가진 monitoring target |
+| `bus_route_snapshots` | 실행당 route/realtime 상태와 이동시간·정류장 요약 |
+| `bus_route_snapshot_lanes` | 해당 실행에서 ODsay가 반환한 버스 후보와 순서 |
+| `bus_realtime_snapshots` | 해당 실행에서 실제 접근 중인 차량 하나당 ETA·정거장·좌석 row |
+
+`BusMonitorStorage.save_snapshot()`은 `BusRouteResult`에서 이 네 table을 한 transaction으로
+append합니다. `collected_at`은 aware UTC를 naive UTC `DATETIME`으로 저장하며, Dashboard가
+표시할 때 KST로 변환합니다. Provider raw JSON, HTTP response와 API key는 저장하지 않습니다.
+구체적인 관계와 운영 절차는 [Bus Monitor README](../packages/bus_monitor/README.md)를 기준으로
+합니다.
+
 ## ERD
 
-실제 Foreign Key 관계가 없으므로 관계선을 만들지 않았다.
+Namuwiki와 Google Finance snapshot은 다른 Package table과 Foreign Key 관계가 없습니다.
+Bus Monitor는 target → route snapshot → lane/realtime snapshot의 Package 내부 Foreign Key
+관계를 가집니다.
 
 ```mermaid
 erDiagram
@@ -175,6 +196,34 @@ erDiagram
         DECIMAL change_percent
         DATETIME collected_at
         DATETIME created_at
+    }
+    BUS_MONITORING_TARGETS ||--o{ BUS_ROUTE_SNAPSHOTS : has
+    BUS_ROUTE_SNAPSHOTS ||--o{ BUS_ROUTE_SNAPSHOT_LANES : retains
+    BUS_ROUTE_SNAPSHOTS ||--o{ BUS_REALTIME_SNAPSHOTS : records
+    BUS_MONITORING_TARGETS {
+        BIGINT id PK
+        VARCHAR name
+        BOOLEAN enabled
+    }
+    BUS_ROUTE_SNAPSHOTS {
+        BIGINT id PK
+        BIGINT monitoring_target_id FK
+        DATETIME collected_at
+        VARCHAR route_status
+        VARCHAR realtime_status
+    }
+    BUS_ROUTE_SNAPSHOT_LANES {
+        BIGINT id PK
+        BIGINT route_snapshot_id FK
+        SMALLINT lane_order
+        VARCHAR local_route_id
+    }
+    BUS_REALTIME_SNAPSHOTS {
+        BIGINT id PK
+        BIGINT route_snapshot_id FK
+        DATETIME collected_at
+        VARCHAR route_id
+        INTEGER arrival_seconds
     }
 ```
 
@@ -501,12 +550,13 @@ Snapshot 중복은 `id` tie-break로 조회 순서를 결정하며, Table 차원
 
 현재 코드에서 실제로 확인되는 장점은 다음과 같다.
 
-1. **저장과 Dashboard 조회가 분리되어 있다.** 저장은 `StockQuoteStorage`와
-   `SnapshotSaveService`, 조회는 `automation_dashboard/queries/`가 담당한다.
+1. **저장과 Dashboard 조회가 분리되어 있다.** 저장은 `StockQuoteStorage`,
+   `SnapshotSaveService`, `BusMonitorStorage`가 담당하고, 조회는
+   `automation_dashboard/queries/`가 담당한다.
 2. **Persistence Model과 Domain Model이 분리되어 있다.** Google Finance는
    `StockQuoteSnapshot.from_domain()`과 `to_domain()`을 명시적으로 제공한다.
-3. **Schema 변경이 Alembic 이력으로 관리된다.** 두 Snapshot Table이 migration revision으로
-   생성되고 downgrade도 정의되어 있다.
+3. **Schema 변경이 Alembic 이력으로 관리된다.** Snapshot table과 Bus Monitor의 target·child
+   table이 migration revision으로 생성되고 downgrade도 정의되어 있다.
 4. **Dashboard는 read-only 흐름이다.** Query와 Operations metadata 조회는 DB를 변경하지
    않으며, 짧은 Session과 detached DTO를 사용한다.
 5. **시간 표현이 명시적이다.** DB에는 naive UTC를 저장하고 Query와 Model이 KST 변환을
