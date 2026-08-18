@@ -16,10 +16,11 @@ def test_dashboard_entrypoint_exposes_main() -> None:
 
 def test_home_attention_ignores_healthy_and_planned_states() -> None:
     """Home only promotes states that require operator attention."""
-    assert app._attention_items("Healthy", "Healthy", "Healthy", "Planned") == []
-    assert app._attention_items("Healthy", "Stale", "No Data", "Unavailable") == [
+    assert app._attention_items("Healthy", "Healthy", "Healthy", "SUCCESS", "Planned") == []
+    assert app._attention_items("Healthy", "Stale", "No Data", "UNAVAILABLE", "Unavailable") == [
         ("Google Finance", "Stale"),
         ("Namuwiki", "No Data"),
+        ("Bus Monitor", "UNAVAILABLE"),
         ("LLM Runtime", "Unavailable"),
     ]
 

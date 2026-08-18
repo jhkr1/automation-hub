@@ -5,10 +5,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from bus_monitor import db_models as bus_monitor_db_models  # noqa: F401 - register metadata
 from database import models  # noqa: F401 - register ORM metadata for Alembic
 from database.base import Base
 from database.config import DatabaseSettings
-from google_finance import db_models  # noqa: F401 - register ORM metadata for Alembic
+from google_finance import db_models as google_finance_db_models  # noqa: F401 - register metadata
 
 config = context.config
 

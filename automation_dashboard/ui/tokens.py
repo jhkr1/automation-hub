@@ -29,13 +29,10 @@ class DashboardTokens:
 TOKENS = DashboardTokens()
 
 STATUS_COLORS: dict[str, str] = {
-    "Healthy": "#188038",
-    "Stale": "#B06000",
-    "No Data": "#5F6368",
-    "Unavailable": "#B3261E",
-    "Invalid Artifact": "#B3261E",
-    "Planned": "#5F6368",
-    "Loading": "#5F6368",
+    "success": "#188038",
+    "warning": "#B06000",
+    "error": "#B3261E",
+    "neutral": "#5F6368",
 }
 
 

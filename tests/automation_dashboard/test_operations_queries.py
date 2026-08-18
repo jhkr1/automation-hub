@@ -14,6 +14,7 @@ from automation_dashboard.queries.operations import (
     load_runtime_info,
     load_snapshot_summary,
 )
+from bus_monitor.db_models import BusMonitoringTarget, BusRouteSnapshot
 from database.models import TrendSnapshot
 from google_finance.db_models import StockQuoteSnapshot
 
@@ -29,6 +30,8 @@ def session() -> Session:
 
     TrendSnapshot.__table__.create(engine)
     StockQuoteSnapshot.__table__.create(engine)
+    BusMonitoringTarget.__table__.create(engine)
+    BusRouteSnapshot.__table__.create(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as database_session:
         yield database_session
@@ -58,6 +61,43 @@ def _quote(identifier: int, collected_at: datetime, symbol: str) -> StockQuoteSn
     )
 
 
+def _bus_target() -> BusMonitoringTarget:
+    """Create one valid monitoring target for operational summary tests."""
+    created_at = datetime(2025, 1, 1)
+    return BusMonitoringTarget(
+        id=1,
+        name="퇴근길",
+        origin_name="지식시스템",
+        origin_latitude=Decimal("37.4043389599242"),
+        origin_longitude=Decimal("127.1024462465310"),
+        destination_name="롯데마트 신갈점",
+        destination_latitude=Decimal("37.2722027953542"),
+        destination_longitude=Decimal("127.1085672900185"),
+        enabled=True,
+        created_at=created_at,
+        updated_at=created_at,
+    )
+
+
+def _bus_snapshot(identifier: int, collected_at: datetime) -> BusRouteSnapshot:
+    """Create one persisted successful Bus Monitor snapshot."""
+    return BusRouteSnapshot(
+        id=identifier,
+        monitoring_target_id=1,
+        collected_at=collected_at.replace(tzinfo=None),
+        route_status="SUCCESS",
+        realtime_status="SUCCESS",
+        total_time_minutes=40,
+        walk_distance_meters=800,
+        transfer_count=1,
+        boarding_station_name="삼평교",
+        boarding_station_id="206000542",
+        alighting_station_name="백남준아트센터",
+        alighting_station_id="228000697",
+        created_at=collected_at.replace(tzinfo=None),
+    )
+
+
 def test_empty_snapshot_summary_and_database_status_are_safe(session: Session) -> None:
     """No persisted data produces zero counts and a read-only connection signal."""
     summary = load_snapshot_summary(session, today=date(2025, 1, 1))
@@ -67,6 +107,8 @@ def test_empty_snapshot_summary_and_database_status_are_safe(session: Session) -
     assert summary.namuwiki_snapshot_count == 0
     assert summary.latest_google_collected_at is None
     assert summary.latest_namuwiki_collected_at is None
+    assert summary.bus_snapshot_count == 0
+    assert summary.latest_bus_collected_at is None
     assert database.status == "Connected"
     assert database.size_bytes is None
 
@@ -81,6 +123,8 @@ def test_snapshot_summary_counts_rows_and_reports_latest_activity_in_kst(session
             _quote(2, latest, "PLTR:NASDAQ"),
             _trend(1, older, 2, "Python"),
             _trend(2, latest, 1, "Database"),
+            _bus_target(),
+            _bus_snapshot(1, latest),
         ]
     )
     session.commit()
@@ -94,6 +138,11 @@ def test_snapshot_summary_counts_rows_and_reports_latest_activity_in_kst(session
     assert summary.latest_google_symbol == "PLTR:NASDAQ"
     assert summary.latest_namuwiki_keyword == "Database"
     assert summary.latest_google_collected_at.isoformat() == "2025-01-02T01:00:00+09:00"
+    assert summary.bus_snapshot_count == 1
+    assert summary.bus_today_snapshot_count == 1
+    assert summary.latest_bus_collected_at.isoformat() == "2025-01-02T01:00:00+09:00"
+    assert summary.latest_bus_route_status == "SUCCESS"
+    assert summary.latest_bus_realtime_status == "SUCCESS"
 
 
 def test_log_summary_uses_fake_directory_metadata_without_reading_content(tmp_path) -> None:
@@ -116,15 +165,15 @@ def test_alembic_status_compares_applied_revision_with_local_script_head(session
     session.execute(
         text(
             "INSERT INTO alembic_version (version_num) "
-            "VALUES ('0003_stock_quote_snapshots')"
+            "VALUES ('0004_bus_monitor_snapshots')"
         )
     )
     session.commit()
 
     status = load_alembic_status(session)
 
-    assert status.current_head == "0003_stock_quote_snapshots"
-    assert status.applied_version == "0003_stock_quote_snapshots"
+    assert status.current_head == "0004_bus_monitor_snapshots"
+    assert status.applied_version == "0004_bus_monitor_snapshots"
     assert status.is_in_sync is True
 
 

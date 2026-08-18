@@ -9,6 +9,17 @@ python scripts/verify.py
 패키지별 실행과 외부 서비스 설정은 각 패키지 문서에서 관리한다. Production Wrapper,
 cron, 로그와 종료 코드 같은 반복 운영 절차는 이 디렉터리의 문서에서 관리한다.
 
+## Dashboard 실행
+
+Dashboard는 repository root에서 다음 공식 명령으로 실행한다.
+
+```bash
+./run_dashboard.sh
+```
+
+Wrapper는 자신의 위치에서 repository root를 계산하고 `.venv/bin/streamlit`과 root `PYTHONPATH`를
+명시한다. 따라서 실행한 shell의 working directory나 기존 `PYTHONPATH`에 의존하지 않는다.
+
 Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여러 key는 quota를
 공유하며, production/test quota를 분리하려면 별도 Project가 필요하다.
 
@@ -16,6 +27,7 @@ Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여
 
 - [`namuwiki_trend 운영 절차`](namuwiki_trend.md): Snapshot, MySQL, 전체 enrichment와 Wrapper
 - [`google_finance 운영 절차`](google_finance.md): Watchlist 수집·분석 Wrapper와 quota 고려사항
+- [`bus_monitor 운영 절차`](bus_monitor.md): target 2 퇴근길 수집 Wrapper와 cron schedule
 - [`Cron 운영 가이드`](cron.md): Job 의존성, 권장 Schedule과 WSL 운영 주의사항
 
 ## 공통 종료 코드
@@ -40,6 +52,7 @@ Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여
 - Namuwiki Snapshot Wrapper: `logs/namuwiki_snapshot.log`
 - Google Finance Wrapper: `logs/google_finance_wrapper.log`
 - Google Finance Python logger: `logs/google_finance.log`
+- Bus Monitor: `logs/bus_monitor.log`
 
 두 Wrapper는 저장소 루트를 기준으로 `.venv/bin/python`을 호출하고 `.env`를 자식
 프로세스에 전달한다. 로그에는 API key와 `.env`의 원문을 기록하지 않는다.

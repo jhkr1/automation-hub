@@ -38,24 +38,17 @@ def test_status_badge_uses_theme_text_and_status_border(monkeypatch: pytest.Monk
         def caption(self, value: str) -> None:
             rendered.append(value)
 
-    components.render_status_badge("Healthy", container=Container())
+    components.render_status_badge("SUCCESS", container=Container())
 
     assert rendered
     assert "var(--text-color)" in rendered[0]
     assert "border:1px solid #188038" in rendered[0]
+    assert "정상" in rendered[0]
 
 
 def test_status_colors_have_textual_state_contract() -> None:
     """Every supported state has a presentation color, while text remains primary."""
-    assert set(STATUS_COLORS) >= {
-        "Healthy",
-        "Stale",
-        "No Data",
-        "Unavailable",
-        "Invalid Artifact",
-        "Planned",
-        "Loading",
-    }
+    assert set(STATUS_COLORS) == {"success", "warning", "error", "neutral"}
 
 
 @pytest.mark.parametrize(

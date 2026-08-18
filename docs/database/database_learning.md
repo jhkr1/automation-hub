@@ -558,7 +558,19 @@ Google Finance 가격 이력을 저장하기 위해 `stock_quote_snapshots`를 �
 `StockQuoteStorage`가 이 Table에 append하고, Google Finance Dashboard Query가 최신 가격,
 가격 이력, 최신 두 Snapshot의 Delta를 읽는다.
 
-이 Revision이 현재 코드 기준 migration head인 `0003_stock_quote_snapshots`다.
+### 0004: Bus Monitor Snapshot
+
+파일: `alembic/versions/0004_create_bus_monitor_snapshots_tables.py`
+
+Bus Monitor의 독립 monitoring target과 append-only 수집 결과를 저장한다.
+
+- `bus_monitoring_targets`: 출발지·목적지 좌표와 enabled 상태
+- `bus_route_snapshots`: route/realtime 상태와 ODsay 경로 요약
+- `bus_route_snapshot_lanes`: ODsay 버스 후보의 반환 순서
+- `bus_realtime_snapshots`: 차량별 Gyeonggi realtime row
+- Target→Route는 `RESTRICT`, Route→child는 `CASCADE` FK
+
+이 Revision이 현재 코드 기준 migration head인 `0004_bus_monitor_snapshots`다.
 
 ## 10. 현재 프로젝트 데이터 흐름
 

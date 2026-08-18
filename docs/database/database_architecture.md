@@ -385,7 +385,7 @@ Dashboard Query의 책임을 명확히 유지하는 편이 단순하다.
 
 - `alembic.ini`: migration script 위치와 기본 logging 설정. URL 값은 비워 두고 runtime에
   `env.py`가 설정한다.
-- `alembic/env.py`: `DatabaseSettings`에서 URL을 읽고 두 ORM module을 import한 뒤
+- `alembic/env.py`: `DatabaseSettings`에서 URL을 읽고 ORM module들을 import한 뒤
   `Base.metadata`를 `target_metadata`로 지정한다.
 - `alembic/versions/`: revision별 `upgrade()`와 `downgrade()`를 보관한다.
 - `alembic_version`: 적용된 revision을 DB에 기록하는 Alembic 관리 테이블이다.
@@ -396,11 +396,12 @@ Dashboard Query의 책임을 명확히 유지하는 편이 단순하다.
 |---|---|---|---|---|
 | `0001_initial_empty` | 없음 | 초기 migration 기준점 | 없음 | 아니오 |
 | `0002_create_trend_snapshots` | `0001_initial_empty` | Namuwiki Snapshot 저장 | `trend_snapshots`, Check·Unique·Index | 아니오 |
-| `0003_stock_quote_snapshots` | `0002_create_trend_snapshots` | Google Finance Snapshot 저장 | `stock_quote_snapshots`, Check·Index | 예 |
+| `0003_stock_quote_snapshots` | `0002_create_trend_snapshots` | Google Finance Snapshot 저장 | `stock_quote_snapshots`, Check·Index | 아니오 |
+| `0004_bus_monitor_snapshots` | `0003_stock_quote_snapshots` | Bus Monitor Snapshot 저장 | target·route·lane·realtime tables, Check·FK·Index | 예 |
 
-코드의 `0003_stock_quote_snapshots_table.py`에서 revision 값은
-`0003_stock_quote_snapshots`이며, `0002_create_trend_snapshots`를 parent로 가진다. 따라서
-현재 Repository의 migration head는 `0003_stock_quote_snapshots`다. 실제 DB 적용 상태는
+코드의 `0004_create_bus_monitor_snapshots_tables.py`에서 revision 값은
+`0004_bus_monitor_snapshots`이며, `0003_stock_quote_snapshots`를 parent로 가진다. 따라서
+현재 Repository의 migration head는 `0004_bus_monitor_snapshots`다. 실제 DB 적용 상태는
 `alembic_version`의 값과 `automation_dashboard/queries/operations.py`의
 `load_alembic_status()` 비교 결과로 확인한다.
 

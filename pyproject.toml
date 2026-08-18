@@ -28,7 +28,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["namuwiki_trend*", "google_finance*", "database*", "automation_dashboard*"]
+include = ["namuwiki_trend*", "google_finance*", "bus_monitor*", "database*", "automation_dashboard*"]
 
 [tool.ruff]
 target-version = "py312"

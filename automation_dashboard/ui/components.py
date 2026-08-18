@@ -12,6 +12,7 @@ import streamlit as st
 
 from automation_dashboard.ui.formatting import format_duration, format_kst_datetime
 from automation_dashboard.ui.layout import configure_chart
+from automation_dashboard.ui.states import status_presentation
 from automation_dashboard.ui.tokens import DASHBOARD_CSS, STATUS_COLORS
 
 
@@ -139,8 +140,9 @@ def render_status_badge(
     container: Any = st,
 ) -> None:
     """Render status text with a non-color fallback for accessibility."""
-    color = STATUS_COLORS.get(status, STATUS_COLORS["Unavailable"])
-    safe_status = escape(status)
+    presentation = status_presentation(status)
+    color = STATUS_COLORS[presentation.tone]
+    safe_status = escape(presentation.label)
     container.markdown(
         (
             '<span '

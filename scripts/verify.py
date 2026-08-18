@@ -11,7 +11,15 @@ CommandRunner = Callable[[Command], int]
 VERIFY_COMMANDS: tuple[Command, ...] = (
     ("ruff", "check", "."),
     ("pytest", "-q"),
-    (sys.executable, "-m", "compileall", "google_finance", "namuwiki_trend", "tests"),
+    (
+        sys.executable,
+        "-m",
+        "compileall",
+        "bus_monitor",
+        "google_finance",
+        "namuwiki_trend",
+        "tests",
+    ),
     ("git", "diff", "--check"),
 )
 

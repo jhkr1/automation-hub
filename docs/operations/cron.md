@@ -11,6 +11,7 @@
 | Google Finance analyze | 저장된 Snapshot과 News를 Batch 분석하고 Insight artifact 저장 | 예 | `run_google_finance.sh --analyze --key-profile production` |
 | Namuwiki snapshot | Top 10 검색어 Snapshot 저장 | 아니오 | `run_namuwiki_snapshot.sh` |
 | Namuwiki trend | 검색어와 News를 Batch 분석하고 trend artifact 저장 | 예 | `run_namuwiki_trend.sh --key-profile production` |
+| Bus Monitor | target 2 route/lane/realtime snapshot 저장 | 아니오 | `run_bus_monitor.sh` |
 
 Package의 실행 방법과 결과 계약은 [Google Finance 운영 문서](google_finance.md)와
 [Namuwiki 운영 문서](namuwiki_trend.md)를 기준으로 한다.
@@ -32,6 +33,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Namuwiki Trend Batch: 매일 08시 30분
 30 8 * * * /home/kstec/projects/automation-hub/run_namuwiki_trend.sh --key-profile production
+
+# Bus Monitor target 2: 평일 17:00, 17:10, 17:20
+0,10,20 17 * * 1-5 /home/kstec/projects/automation-hub/run_bus_monitor.sh
 ```
 
 08:00 Google Finance collect가 먼저 DB에 Snapshot을 저장하고, 08:10 analyze는 저장된
@@ -117,6 +121,7 @@ cron의 제한된 `PATH`에 의존하지 않도록 Wrapper가 자체 `PATH`도 �
 | Google Finance | `logs/google_finance.lock` | `logs/google_finance_wrapper.log` | 600초 |
 | Namuwiki trend | `logs/namuwiki_trend.lock` | `logs/namuwiki_trend.log` | 600초 |
 | Namuwiki snapshot | `logs/namuwiki_snapshot.lock` | `logs/namuwiki_snapshot.log` | 600초 |
+| Bus Monitor target 2 | `logs/bus_monitor_target_2.lock` | `logs/bus_monitor.log` | 600초 |
 
 Wrapper는 `flock -n`으로 동일 Job의 중복 실행을 차단한다. Google Finance의 collect와
 analyze는 같은 lock을 사용하므로 서로 겹치지 않는다. Namuwiki trend와 snapshot은
@@ -134,6 +139,7 @@ Wrapper 로그는 다음 절대 경로 아래에 생성된다.
 /home/kstec/projects/automation-hub/logs/google_finance_wrapper.log
 /home/kstec/projects/automation-hub/logs/namuwiki_trend.log
 /home/kstec/projects/automation-hub/logs/namuwiki_snapshot.log
+/home/kstec/projects/automation-hub/logs/bus_monitor.log
 ```
 
 Python logger가 별도 파일을 사용하는 Job은 Wrapper 로그와 Application 로그를 함께

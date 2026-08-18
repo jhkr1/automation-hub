@@ -39,6 +39,13 @@ python scripts/verify.py
 
 외부 서비스나 MySQL이 필요한 실행은 각 Package 문서와 운영 문서에서 환경 조건을 확인합니다.
 
+Dashboard는 optional dependency 설치 후 repository root에서 다음 공식 명령으로 실행합니다.
+
+```bash
+pip install -e ".[dashboard,dev]"
+./run_dashboard.sh
+```
+
 ## Packages
 
 | Package | 현재 기능 | 실행 문서 | 설계 문서 |

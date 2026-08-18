@@ -30,6 +30,7 @@ from automation_dashboard.ui.states import (
     GOOGLE_FRESHNESS_THRESHOLD,
     NAMUWIKI_FRESHNESS_THRESHOLD,
     availability_state,
+    bus_monitor_state,
     freshness_state,
     render_database_error,
 )
@@ -59,6 +60,7 @@ def _attention_items(
     database_status: str,
     google_status: str,
     namuwiki_status: str,
+    bus_status: str,
     llm_status: str,
 ) -> list[tuple[str, str]]:
     """Return one concise attention item per unavailable monitored source."""
@@ -69,6 +71,8 @@ def _attention_items(
         items.append(("Google Finance", google_status))
     if namuwiki_status in {"Stale", "No Data", "Unavailable"}:
         items.append(("Namuwiki", namuwiki_status))
+    if bus_status in {"FAILED", "UNAVAILABLE", "No Data", "Unknown"}:
+        items.append(("Bus Monitor", bus_status))
     if llm_status in {"Unavailable", "Invalid Artifact"}:
         items.append(("LLM Runtime", llm_status))
     return items
@@ -102,6 +106,17 @@ def _activity_items(
                 },
             )
         )
+    if snapshots.latest_bus_collected_at is not None:
+        events.append(
+            (
+                snapshots.latest_bus_collected_at,
+                {
+                    "timestamp": format_kst_datetime(snapshots.latest_bus_collected_at),
+                    "label": "Bus Monitor snapshot",
+                    "detail": "Latest route and realtime collection",
+                },
+            )
+        )
     if llm_usage.last_request_at_kst is not None:
         events.append(
             (
@@ -120,11 +135,6 @@ def _activity_items(
 
 def main() -> None:
     """Render the Dashboard landing page without invoking automations."""
-    st.set_page_config(
-        page_title="Automation Hub Dashboard",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
     apply_dashboard_theme()
     render_sidebar_context()
 
@@ -151,11 +161,16 @@ def main() -> None:
         snapshots.latest_namuwiki_collected_at,
         threshold=NAMUWIKI_FRESHNESS_THRESHOLD,
     )
+    bus_state = bus_monitor_state(
+        snapshots.latest_bus_route_status,
+        snapshots.latest_bus_realtime_status,
+    )
     llm_status = llm_usage.status.value
     attention = _attention_items(
         database_state.label,
         google_state.label,
         namuwiki_state.label,
+        bus_state.label,
         llm_status,
     )
     overall_status = "Healthy" if not attention else "Attention Needed"
@@ -172,11 +187,7 @@ def main() -> None:
         ("Database", database_state.label, database_state.detail),
         ("Google Finance", google_state.label, google_state.detail),
         ("Namuwiki", namuwiki_state.label, namuwiki_state.detail),
-        (
-            "LLM Runtime",
-            llm_status,
-            f"{sum(profile.requests_today for profile in llm_usage.profiles)} requests today",
-        ),
+        ("Bus Monitor", bus_state.label, bus_state.detail),
     )
     for column, (label, value, detail) in zip(overview_columns, overview_cards, strict=True):
         with column:
@@ -190,7 +201,7 @@ def main() -> None:
             render_attention_banner(label, f"현재 상태: {status}")
 
     render_section_title("Package Overview")
-    package_columns = st.columns(2)
+    package_columns = st.columns(3)
     with package_columns[0]:
         google_detail = (
             f"Latest: {format_kst_datetime(snapshots.latest_google_collected_at)}"
@@ -218,6 +229,20 @@ def main() -> None:
             detail=f"{namuwiki_detail} · Keyword: {snapshots.latest_namuwiki_keyword or '—'}",
             link_label="Open Namuwiki",
             link_target="pages/2_namuwiki.py",
+        )
+    with package_columns[2]:
+        bus_detail = (
+            f"Latest: {format_kst_datetime(snapshots.latest_bus_collected_at)}"
+            if snapshots.latest_bus_collected_at
+            else "저장된 Snapshot이 없습니다."
+        )
+        render_overview_card(
+            "Bus Monitor",
+            f"{format_integer(snapshots.bus_snapshot_count)} snapshots",
+            status=bus_state.label,
+            detail=bus_detail,
+            link_label="Open Bus Monitor",
+            link_target="pages/4_bus_monitor.py",
         )
 
     render_section_title(
@@ -247,10 +272,11 @@ def main() -> None:
     render_timeline_card("Latest Activity", _activity_items(snapshots, llm_usage))
 
     render_section_title("Navigation", "상세 조회 화면으로 이동합니다.")
-    navigation_columns = st.columns(3)
+    navigation_columns = st.columns(4)
     navigation = (
+        ("Bus Monitor", "pages/4_bus_monitor.py"),
         ("Google Finance", "pages/1_google_finance.py"),
-        ("Namuwiki", "pages/2_namuwiki.py"),
+        ("Namuwiki Trend", "pages/2_namuwiki.py"),
         ("Operations", "pages/3_operations.py"),
     )
     for column, (label, target) in zip(navigation_columns, navigation, strict=True):
@@ -259,4 +285,18 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    st.set_page_config(
+        page_title="Automation Hub Dashboard",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    selected_page = st.navigation(
+        [
+            st.Page(main, title="Home", default=True),
+            st.Page("pages/4_bus_monitor.py", title="Bus Monitor", url_path="bus_monitor"),
+            st.Page("pages/1_google_finance.py", title="Google Finance", url_path="google_finance"),
+            st.Page("pages/2_namuwiki.py", title="Namuwiki Trend", url_path="namuwiki"),
+            st.Page("pages/3_operations.py", title="Operations", url_path="operations"),
+        ]
+    )
+    selected_page.run()

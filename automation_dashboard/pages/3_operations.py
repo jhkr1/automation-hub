@@ -1,124 +1,74 @@
-"""Read-only operational status dashboard page."""
+"""Read-only operator-focused status dashboard page."""
 
-import pandas as pd
+from datetime import datetime
+
 import streamlit as st
 
 from automation_dashboard.config import DashboardConfigurationError
 from automation_dashboard.queries.operations import (
     AlembicStatus,
     DatabaseSummary,
-    LogSummary,
     OperationsSnapshotSummary,
-    RuntimeInfo,
     load_alembic_status,
     load_database_summary,
-    load_log_summary,
-    load_runtime_info,
     load_snapshot_summary,
 )
-from automation_dashboard.readers.llm_usage import LlmUsageReadModel, read_llm_usage
-from automation_dashboard.readers.namuwiki_insights import InsightStatus
 from automation_dashboard.session import DashboardDatabaseError, dashboard_session
 from automation_dashboard.ui.components import (
     apply_dashboard_theme,
-    render_empty_state,
     render_metadata_card,
     render_metric_card,
     render_page_hero,
     render_section_title,
-    render_table_card,
-    render_timeline_card,
+    render_status_badge,
 )
-from automation_dashboard.ui.formatting import (
-    format_file_size,
-    format_integer,
-    format_kst_datetime,
-    format_repository_location,
-)
+from automation_dashboard.ui.formatting import format_integer, format_kst_datetime
 from automation_dashboard.ui.layout import render_sidebar_context
 from automation_dashboard.ui.states import (
     GOOGLE_FRESHNESS_THRESHOLD,
     NAMUWIKI_FRESHNESS_THRESHOLD,
+    DisplayState,
     availability_state,
+    bus_monitor_state,
     freshness_state,
     render_database_error,
+    status_presentation,
 )
 
 
 @st.cache_data(ttl=60, show_spinner=False)
 def _load_database_summary() -> DatabaseSummary:
-    """Cache detached database status DTOs, never Sessions or engines."""
+    """Cache detached database connectivity data for the operator view."""
     with dashboard_session() as session:
         return load_database_summary(session)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
 def _load_snapshot_summary() -> OperationsSnapshotSummary:
-    """Cache detached snapshot totals and recent activity DTOs."""
+    """Cache detached latest collection data for the three monitored jobs."""
     with dashboard_session() as session:
         return load_snapshot_summary(session)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
 def _load_alembic_status() -> AlembicStatus:
-    """Cache detached migration status DTOs while keeping the Session short-lived."""
+    """Cache migration metadata for the collapsed operational-detail section."""
     with dashboard_session() as session:
         return load_alembic_status(session)
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def _load_log_summary() -> LogSummary:
-    """Cache detached file metadata for a short display interval."""
-    return load_log_summary()
-
-
-@st.cache_data(ttl=60, show_spinner=False)
-def _load_runtime_info() -> RuntimeInfo:
-    """Cache detached local process metadata without caching database resources."""
-    return load_runtime_info()
-
-
-@st.cache_data(ttl=60, show_spinner=False)
-def _load_llm_usage() -> LlmUsageReadModel:
-    """Cache safe quota ledger metadata without caching file handles."""
-    return read_llm_usage()
-
-
-def _render_llm_usage(model: LlmUsageReadModel) -> None:
-    """Render quota counts only; keys, prompts, and responses never enter the UI."""
-    render_section_title(
-        "LLM Runtime",
-        "Quota ledger의 읽기 전용 상태입니다. Provider 호출과 ledger 변경은 수행하지 않습니다.",
-    )
-    usage_columns = st.columns(3)
-    with usage_columns[0]:
-        render_metric_card("Ledger Status", model.status.value)
-    with usage_columns[1]:
-        render_metric_card("Retry Count", format_integer(model.retry_count))
-    with usage_columns[2]:
-        render_metric_card("Last Request", format_kst_datetime(model.last_request_at_kst))
-    if model.status in {InsightStatus.NO_DATA, InsightStatus.UNAVAILABLE}:
-        render_empty_state(model.message or "LLM usage 정보가 없습니다.")
-        return
-    if not model.profiles:
-        render_empty_state("오늘 LLM 요청 기록이 없습니다.")
-        return
-    render_table_card(
-        "Profile Usage",
-        pd.DataFrame(
-            [
-                {
-                    "Project Profile": profile.project_profile,
-                    "Requests Today": profile.requests_today,
-                }
-                for profile in model.profiles
-            ]
-        ),
-    )
+def _render_job_card(name: str, state: DisplayState, collected_at: datetime | None) -> None:
+    """Render one concise job-health card without exposing internal implementation IDs."""
+    with st.container(border=True):
+        st.subheader(name)
+        render_status_badge(state.label)
+        st.caption("마지막 적재")
+        st.write(format_kst_datetime(collected_at))
+        st.caption(state.detail)
 
 
 def main() -> None:
-    """Render the read-only operations overview without starting any automation."""
+    """Render the operator's quick health assessment without starting any job."""
     apply_dashboard_theme()
     render_sidebar_context()
     try:
@@ -128,138 +78,82 @@ def main() -> None:
     except (DashboardConfigurationError, DashboardDatabaseError):
         render_page_hero(
             "Operations",
-            "현재 시스템 상태를 조회하는 Read-only 페이지입니다.",
+            "각 자동화 Job의 최근 적재 상태를 빠르게 확인합니다.",
             status="Unavailable",
         )
         render_database_error()
         return
-    logs = _load_log_summary()
-    runtime = _load_runtime_info()
-    llm_usage = _load_llm_usage()
 
-    latest_times = [
-        value
-        for value in (
-            snapshots.latest_google_collected_at,
-            snapshots.latest_namuwiki_collected_at,
-        )
-        if value is not None
-    ]
-    database_status = availability_state(database.status == "Connected")
-    migration_status = availability_state(alembic.is_in_sync)
-    google_status = freshness_state(
+    database_state = availability_state(database.status == "Connected")
+    google_state = freshness_state(
         snapshots.latest_google_collected_at,
         threshold=GOOGLE_FRESHNESS_THRESHOLD,
     )
-    namuwiki_status = freshness_state(
+    namuwiki_state = freshness_state(
         snapshots.latest_namuwiki_collected_at,
         threshold=NAMUWIKI_FRESHNESS_THRESHOLD,
     )
+    bus_state = bus_monitor_state(
+        snapshots.latest_bus_route_status,
+        snapshots.latest_bus_realtime_status,
+    )
+    jobs = (
+        ("Google Finance", google_state, snapshots.latest_google_collected_at),
+        ("Namuwiki", namuwiki_state, snapshots.latest_namuwiki_collected_at),
+        ("Bus Monitor", bus_state, snapshots.latest_bus_collected_at),
+    )
+    latest_times = [collected_at for _, _, collected_at in jobs if collected_at is not None]
+    tones = [status_presentation(state.label).tone for _, state, _ in jobs]
+    healthy_count = tones.count("success")
+    warning_count = tones.count("warning") + tones.count("neutral")
+    failed_count = tones.count("error")
+    overall_status = "Healthy" if warning_count == 0 and failed_count == 0 else "Attention Needed"
+
     render_page_hero(
         "Operations",
-        "현재 시스템 상태를 조회하는 Read-only 페이지입니다.",
-        status=database_status.label,
+        "각 자동화 Job의 최근 적재 상태를 빠르게 확인합니다.",
+        status=overall_status,
         last_updated=max(latest_times) if latest_times else None,
     )
-    render_section_title("System Health", "저장소와 최신 Package 상태입니다.")
-    status_columns = st.columns(4)
-    for column, label, state in (
-        (status_columns[0], "Database", database_status),
-        (status_columns[1], "Alembic", migration_status),
-        (status_columns[2], "Google Latest", google_status),
-        (status_columns[3], "Namuwiki Latest", namuwiki_status),
-    ):
-        with column:
-            render_metric_card(label, state.label, detail=state.detail)
-
-    render_section_title("Runtime", "현재 Dashboard 프로세스의 로컬 실행 정보입니다.")
-    render_metadata_card(
-        "Runtime Details",
-        {
-            "Python": runtime.python_version,
-            "Streamlit": runtime.streamlit_version,
-            "Timezone": runtime.timezone,
-            "Working Directory": format_repository_location(runtime.working_directory),
-        },
+    render_section_title("Automation Status", "정상 여부와 마지막 적재시각을 먼저 확인합니다.")
+    summary_columns = st.columns(4)
+    summary_items = (
+        ("정상 Job", str(healthy_count)),
+        ("주의 필요", str(warning_count)),
+        ("실패", str(failed_count)),
+        ("최근 확인", format_kst_datetime(max(latest_times) if latest_times else None)),
     )
-    _render_llm_usage(llm_usage)
-
-    render_section_title("Storage", "저장된 Snapshot 행과 현재 KST 날짜의 수집 행입니다.")
-    storage_columns = st.columns(4)
-    storage_cards = (
-        ("Google Snapshots", format_integer(snapshots.google_snapshot_count)),
-        ("Namuwiki Snapshots", format_integer(snapshots.namuwiki_snapshot_count)),
-        (
-            "Today's Collections",
-            format_integer(
-                snapshots.google_today_snapshot_count + snapshots.namuwiki_today_snapshot_count
-            ),
-        ),
-        ("Database Size", format_file_size(database.size_bytes)),
-    )
-    for column, (label, value) in zip(storage_columns, storage_cards, strict=True):
+    for column, (label, value) in zip(summary_columns, summary_items, strict=True):
         with column:
             render_metric_card(label, value)
 
-    render_section_title("Recent Activity", "가장 최근에 저장된 각 Package의 Snapshot입니다.")
-    activity_items = []
-    if snapshots.latest_google_collected_at is not None:
-        activity_items.append(
-            {
-                "timestamp": format_kst_datetime(snapshots.latest_google_collected_at),
-                "label": "Google Finance",
-                "detail": snapshots.latest_google_symbol or "Latest snapshot",
-                "sort_at": snapshots.latest_google_collected_at,
-            }
-        )
-    if snapshots.latest_namuwiki_collected_at is not None:
-        activity_items.append(
-            {
-                "timestamp": format_kst_datetime(snapshots.latest_namuwiki_collected_at),
-                "label": "Namuwiki",
-                "detail": snapshots.latest_namuwiki_keyword or "Latest snapshot",
-                "sort_at": snapshots.latest_namuwiki_collected_at,
-            }
-        )
-    activity_items.sort(key=lambda item: item["sort_at"], reverse=True)
-    render_timeline_card(
-        "Latest Activity",
-        [
-            {key: value for key, value in item.items() if key != "sort_at"}
-            for item in activity_items
-        ],
-        empty_message="저장된 Snapshot이 없습니다.",
-    )
+    render_section_title("Job Status", "Job별 상태와 다음 확인 지점을 표시합니다.")
+    job_columns = st.columns(3)
+    for column, (name, state, collected_at) in zip(job_columns, jobs, strict=True):
+        with column:
+            _render_job_card(name, state, collected_at)
 
-    render_section_title("Logs", "Wrapper 로그의 파일 메타데이터만 표시합니다.")
-    if not logs.files:
-        render_empty_state("아직 생성된 로그가 없습니다.")
-    else:
-        render_table_card(
-            "Wrapper Logs",
-            pd.DataFrame(
-                [
-                    {
-                        "File": item.name,
-                        "Status": "Available",
-                        "Updated": format_kst_datetime(item.modified_at),
-                        "Size": format_file_size(item.size_bytes),
-                    }
-                    for item in logs.files
-                ]
-            ),
-        )
-
-    render_section_title("Migration", "Repository migration head와 적용된 버전을 비교합니다.")
-    if alembic.current_head is None or alembic.applied_version is None:
-        render_empty_state("Migration 정보를 확인할 수 없습니다.")
-    else:
+    with st.expander("운영 상세 정보"):
+        migration_state = availability_state(alembic.is_in_sync)
         render_metadata_card(
-            "Migration Details",
+            "Storage Summary",
             {
-                "Status": migration_status.label,
-                "Applied Version": alembic.applied_version,
-                "Repository Head": alembic.current_head,
+                "Google Finance Snapshots": format_integer(snapshots.google_snapshot_count),
+                "Namuwiki Snapshots": format_integer(snapshots.namuwiki_snapshot_count),
+                "Bus Monitor Snapshots": format_integer(snapshots.bus_snapshot_count),
+                "Today's Collections": format_integer(
+                    snapshots.google_today_snapshot_count
+                    + snapshots.namuwiki_today_snapshot_count
+                    + snapshots.bus_today_snapshot_count
+                ),
+            },
+        )
+        render_metadata_card(
+            "System Details",
+            {
+                "Database": database_state.detail,
+                "Migration": status_presentation(migration_state.label).label,
+                "Migration Detail": migration_state.detail,
             },
         )
 

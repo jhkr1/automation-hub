@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from automation_dashboard.config import PROJECT_ROOT
 from automation_dashboard.queries.google_finance import SEOUL_TZ, to_seoul_time
+from bus_monitor.db_models import BusRouteSnapshot
 from database.models import TrendSnapshot
 from google_finance.db_models import StockQuoteSnapshot
 
@@ -41,6 +42,11 @@ class OperationsSnapshotSummary:
     latest_google_symbol: str | None
     latest_namuwiki_collected_at: datetime | None
     latest_namuwiki_keyword: str | None
+    bus_snapshot_count: int = 0
+    bus_today_snapshot_count: int = 0
+    latest_bus_collected_at: datetime | None = None
+    latest_bus_route_status: str | None = None
+    latest_bus_realtime_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +126,7 @@ def load_snapshot_summary(
     day_start, day_end = _seoul_day_bounds(target_date)
     google_total = session.scalar(select(func.count(StockQuoteSnapshot.id))) or 0
     namuwiki_total = session.scalar(select(func.count(TrendSnapshot.id))) or 0
+    bus_total = session.scalar(select(func.count(BusRouteSnapshot.id))) or 0
     google_today = (
         session.scalar(
             select(func.count(StockQuoteSnapshot.id)).where(
@@ -135,6 +142,15 @@ def load_snapshot_summary(
         )
         or 0
     )
+    bus_today = (
+        session.scalar(
+            select(func.count(BusRouteSnapshot.id)).where(
+                BusRouteSnapshot.collected_at >= day_start,
+                BusRouteSnapshot.collected_at <= day_end,
+            )
+        )
+        or 0
+    )
     latest_google = session.execute(
         select(StockQuoteSnapshot.collected_at, StockQuoteSnapshot.symbol)
         .order_by(StockQuoteSnapshot.collected_at.desc(), StockQuoteSnapshot.id.desc())
@@ -143,6 +159,15 @@ def load_snapshot_summary(
     latest_namuwiki = session.execute(
         select(TrendSnapshot.collected_at, TrendSnapshot.keyword)
         .order_by(TrendSnapshot.collected_at.desc(), TrendSnapshot.id.desc())
+        .limit(1)
+    ).one_or_none()
+    latest_bus = session.execute(
+        select(
+            BusRouteSnapshot.collected_at,
+            BusRouteSnapshot.route_status,
+            BusRouteSnapshot.realtime_status,
+        )
+        .order_by(BusRouteSnapshot.collected_at.desc(), BusRouteSnapshot.id.desc())
         .limit(1)
     ).one_or_none()
     return OperationsSnapshotSummary(
@@ -158,6 +183,13 @@ def load_snapshot_summary(
             None if latest_namuwiki is None else to_seoul_time(latest_namuwiki.collected_at)
         ),
         latest_namuwiki_keyword=None if latest_namuwiki is None else latest_namuwiki.keyword,
+        bus_snapshot_count=int(bus_total),
+        bus_today_snapshot_count=int(bus_today),
+        latest_bus_collected_at=(
+            None if latest_bus is None else to_seoul_time(latest_bus.collected_at)
+        ),
+        latest_bus_route_status=None if latest_bus is None else latest_bus.route_status,
+        latest_bus_realtime_status=None if latest_bus is None else latest_bus.realtime_status,
     )
 
 
