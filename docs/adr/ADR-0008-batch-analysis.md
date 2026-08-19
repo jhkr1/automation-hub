@@ -58,16 +58,17 @@ Parser는 schema가 있어도 missing, duplicate, unknown item, pair mismatch와
    fail-fast artifact 계약과 맞지 않는다.
 3. JSON을 문자열에서 fuzzy extraction하거나 자동 복구한다. 잘못된 mapping을 정상으로
    오인할 수 있어 선택하지 않았다.
-4. Google Finance에도 같은 Batch를 즉시 적용한다. 현재 Google Finance는 종목별
-   Generator를 사용하므로 이번 결정의 범위에 포함하지 않는다.
+4. Google Finance에도 같은 Batch를 즉시 적용한다. 당시 Google Finance는 종목별
+   Generator를 사용하므로 이번 결정의 범위에 포함하지 않았다.
+
+## Follow-up
+
+이 ADR의 결정 범위는 Namuwiki Batch입니다. 이후 Google Finance Watchlist Batch와 Dashboard
+Insight 표시가 별도 구현으로 완료되었으며, 이는 당시 Namuwiki 결정의 Context와 Decision을
+변경하지 않습니다.
 
 ## Related Documents
 
 - [LLM Runtime operations](../operations/llm_runtime.md)
 - [Namuwiki operations](../operations/namuwiki_trend.md)
 - [Namuwiki Package Architecture](../packages/namuwiki_trend/architecture.md)
-
-## Future Work
-
-- Google Finance Batch
-- Dashboard LLM Insights

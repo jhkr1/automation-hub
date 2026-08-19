@@ -54,8 +54,11 @@ Gemini key는 job과 profile로 선택한다. 같은 Google Cloud Project의 여
 - Google Finance Python logger: `logs/google_finance.log`
 - Bus Monitor: `logs/bus_monitor.log`
 
-두 Wrapper는 저장소 루트를 기준으로 `.venv/bin/python`을 호출하고 `.env`를 자식
-프로세스에 전달한다. 로그에는 API key와 `.env`의 원문을 기록하지 않는다.
+Job wrapper는 `run_google_finance.sh`, `run_namuwiki_trend.sh`, `run_namuwiki_snapshot.sh`,
+`run_bus_monitor.sh` 네 개다. 이 wrapper들은 저장소 루트를 기준으로 `.venv/bin/python`을
+호출하고 `.env`를 자식 프로세스에 전달한다. `run_dashboard.sh`는 별도 Dashboard launcher로
+`.venv/bin/streamlit`과 root `PYTHONPATH`를 설정한다. 로그에는 API key와 `.env`의 원문을
+기록하지 않는다.
 
 ## Production 등록 전 체크리스트
 

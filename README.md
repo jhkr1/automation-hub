@@ -77,6 +77,14 @@ Bus Monitor는 좌표 기반 통근 target 하나의 첫 버스 구간을 ODsay�
 
 ## Documentation
 
+학습과 코드 탐색은 다음 순서로 시작할 수 있습니다.
+
+- [Study Roadmap](docs/learning/STUDY_NOTE.md): 무엇을 어떤 순서로 공부할지 확인합니다.
+- [Concepts](docs/concepts/README.md): 개별 Software Engineering 개념을 학습합니다.
+- [Architecture Handbook](docs/handbook/README.md): `automation-hub`의 설계 과정과 trade-off를 Case Study로 읽습니다.
+- [Codebase Guide](CODEBASE_GUIDE.md): 실제 코드를 어디서부터 읽을지 확인합니다.
+- [Package Docs](docs/packages/): 특정 자동화 기능의 실행 방법과 Architecture를 확인합니다.
+
 | I want to... | Start here |
 |---|---|
 | Run a package | [Package README](docs/packages/) |

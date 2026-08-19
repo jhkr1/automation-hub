@@ -50,7 +50,7 @@ Root Architecture는 Package 내부의 Movement Rule, Watchlist, News Provider, 
 
 Root의 `database/`는 모든 저장 구현을 추상화한 순수 공통 계층이 아닙니다. `database.base`, engine, session과 config 같은 DB 기반이 있고, `database.models`, `daily_trend_query.py`, `snapshot_save_service.py`처럼 현재 `namuwiki_trend`와 직접 연결된 코드도 함께 있습니다. Google Finance와 Bus Monitor의 persistence model은 각각 `google_finance/db_models.py`, `bus_monitor/db_models.py`에 있으며 Root `database.base`를 사용합니다.
 
-따라서 현재의 공통 기반과 Package 전용 코드가 완전히 분리되어 있다고 표현하지 않습니다. 이 경계와 변경 영향은 각 Package Architecture와 관련 [ADR](decisions/)에서 함께 확인해야 합니다.
+따라서 현재의 공통 기반과 Package 전용 코드가 완전히 분리되어 있다고 표현하지 않습니다. 이 경계와 변경 영향은 각 Package Architecture, [Decision Records](decisions/)와 [LLM ADRs](adr/)에서 함께 확인해야 합니다.
 
 ## Dependency Direction
 
@@ -127,8 +127,13 @@ flowchart TD
 | `docs/packages/<package>/architecture.md` 또는 Package별 설계 문서 | Package 내부 설계 Reference |
 | [Operations](operations/README.md) | 운영 환경과 실행 절차 |
 | [Decision Records](decisions/README.md) | 장기 설계 결정 |
+| `docs/adr/` | LLM Runtime 관련 ADR과 후속 상태 |
+| [Concepts](concepts/README.md) | 개념 자체를 설명하는 교재 |
+| [Database Architecture](database/database_architecture.md) | 실제 DB 계층과 schema reference |
+| [Database Learning](database/database_learning.md) | SQLAlchemy·Alembic 코드 따라가기 |
 | [Development Log](development/DEV_LOG.md) | 시간순 개발 기록 |
 | [Architecture Handbook](handbook/README.md) | 설계 판단을 학습하는 서사 |
+| [Playwright PoC](poc/playwright-preparation.md) | 브라우저 자동화 조사·실험 기록 |
 
 같은 내용을 여러 문서에 복사하지 않습니다. 공통 Architecture는 이 문서에서, Package 내부 설계는 Package Architecture에서, 학습용 설명은 Handbook에서 관리하고 서로 링크합니다.
 

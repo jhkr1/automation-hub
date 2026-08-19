@@ -10,9 +10,9 @@ Google Finance, Namuwiki Trends, Operations, Bus Monitor의 저장 상태를 조
 |---|---|
 | Home | 전체 Dashboard overview와 주요 Package 상태 |
 | Bus Monitor | KST 조회시간·도착 ETA·남은 정류장/좌석 중심의 최신 통근 상태와 당일 이동시간·대기시간·좌석 추이 |
-| Google Finance | 최신 가격, 선택 종목의 가격 이력, Snapshot 비교 |
+| Google Finance | 최신 가격, 선택 종목의 가격 이력·Snapshot 비교, production Insight artifact의 정확한 종목별 요약 |
 | Namuwiki Trend | 최신 Top 10, 선택 검색어 순위 이력, 검색어 통계, 저장된 LLM Insight |
-| Operations | Snapshot·로그 파일 메타데이터·Alembic·런타임·LLM quota 상태 |
+| Operations | Job별 최근 적재 상태, snapshot 수와 Alembic 적용 상태 |
 
 모든 화면은 같은 KST 시간, 숫자 포맷, Empty State와 최대 60초 조회 캐시를 사용합니다.
 
@@ -46,17 +46,18 @@ Dashboard는 `DASHBOARD_DATABASE_URL`을 우선 사용하고, 로컬 MVP에서�
 
 - symbol별 최신 가격, 수집 시각, snapshot 수
 - 선택 symbol의 가격 추이와 최신 두 snapshot delta
+- `output/google_finance_insights.json`의 read-only production Insight와 정확한 선택 symbol 매칭
 - Namuwiki 최신 Top 10, 검색어별 순위 이력, 저장 통계
-- Operations의 Snapshot·로그 파일 메타데이터·Alembic·런타임 상태
+- Operations의 Job별 최근 적재, snapshot 수와 Alembic 상태
 - enabled Bus Monitor target의 KST 조회시간·도착 ETA·남은 정류장/좌석 중심 최신 상태와 당일 이력·3개 추이 chart
 - Namuwiki `output/trend_insights.json`의 read-only LLM Insight와 freshness 상태
-- Local quota ledger의 profile별 요청 수와 retry count
+- Home의 Local quota ledger profile별 요청 수, retry count와 최근 요청 시각
 - data 없음 및 database 연결 실패의 안전한 화면
 
-Google Finance Insight artifact 저장은 아직 구현하지 않았으며, Google Finance 화면은 Planned
-placeholder만 표시합니다. Dashboard는 Gemini를 직접 호출하지 않고, Namuwiki artifact가 오래되거나
-손상된 경우 Healthy 결과로 표시하지 않습니다. 이 Dashboard는 로컬 Streamlit 화면이며, 외부 공개
-전에는 MySQL read-only 계정을 사용해야 합니다.
+Dashboard는 Gemini를 직접 호출하지 않습니다. Google Finance 페이지는 production artifact만
+read-only로 읽고, 선택한 Watchlist symbol과 정확히 일치하는 Insight만 표시합니다. Namuwiki
+artifact가 오래되거나 손상된 경우에는 Healthy 결과로 표시하지 않습니다. 이 Dashboard는 로컬
+Streamlit 화면이며, 외부 공개 전에는 MySQL read-only 계정을 사용해야 합니다.
 
 Namuwiki artifact의 `Healthy` 또는 `Stale` 상태는 파일 freshness만 나타내며, 현재 Provider의
 Live smoke test 성공을 보장하지 않습니다. Live 검증이 완료되기 전에는 생성 시각과 상태를 함께

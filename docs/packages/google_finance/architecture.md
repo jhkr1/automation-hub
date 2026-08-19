@@ -20,8 +20,9 @@
 | Entrypoint | `main.py`, `watchlist_main.py` | 단일 종목·Watchlist CLI 조립과 출력 |
 | Collection | `collector.py`, `extraction.py`, `pipeline.py` | Quote 수집과 내부 `StockPrice` 변환 |
 | Domain | `models.py`, `movement.py` | 주가 데이터 계약과 snapshot Movement 계산 |
-| Application | `movement_application.py`, `analysis_application.py`, `watchlist_application.py` | Storage·Domain·Provider 실행 순서 조정 |
-| Provider | `news.py`, `analysis_generator.py` | Google News RSS와 Gemini 연결 |
+| Application | `movement_application.py`, `analysis_application.py`, `watchlist_application.py` | Storage·Domain·Provider 실행 순서와 단일·Batch 분석 조정 |
+| Provider / LLM adapter | `news.py`, `analysis_generator.py`, `batch_analysis.py` | Google News RSS, 단일 symbol Gemini와 Watchlist Batch Gemini 연결 |
+| Artifact | `insight_artifact.py` | profile별 Insight artifact 변환·원자적 저장 |
 | Persistence | `db_models.py`, `storage.py` | MySQL snapshot 변환·저장·조회 |
 | Configuration | `config.py` | 환경 변수와 logger 조립 |
 
@@ -31,7 +32,8 @@ flowchart TD
     Package --> Collection[Collector and Extraction]
     Package --> Domain[Models and Movement]
     Package --> Application[Application Flows]
-    Package --> Providers[News and Gemini]
+    Package --> Providers[News and Gemini adapters]
+    Package --> Artifact[Insight artifact]
     Package --> Persistence[Snapshot Storage]
 ```
 
@@ -49,9 +51,14 @@ Application 모듈은 이미 존재하는 구성요소의 실행 순서를 조�
 - `analysis_application.py`: Movement 결과, News Provider와 Gemini Generator를 연결합니다.
 - `watchlist_application.py`: 설정된 symbol을 순차 처리하고 종목별 결과를 집계합니다.
 
+Watchlist 분석은 `analysis_application.py`의 `analyze_stored_quotes_batch()`가 분석 가능한
+symbol을 준비하고, `batch_analysis.py`의 `GeminiStockInsightBatchGenerator`가 하나의 Batch
+응답을 symbol별 결과로 검증합니다. `watchlist_main.py`는 실패·사용 불가 결과가 없을 때
+`insight_artifact.py`로 profile별 artifact를 저장합니다.
+
 ### Provider and Collection
 
-`collector.py`와 `extraction.py`는 Google Finance 화면의 외부 문자열을 수집·검증하고 `StockPrice`로 변환합니다. `news.py`는 Google News RSS를 `StockNewsArticle`로 변환하고, `analysis_generator.py`는 공개 뉴스 기반 `StockInsight`를 생성합니다.
+`collector.py`와 `extraction.py`는 Google Finance 화면의 외부 문자열을 수집·검증하고 `StockPrice`로 변환합니다. `news.py`는 Google News RSS를 `StockNewsArticle`로 변환합니다. `analysis_generator.py`는 단일 symbol 분석을, `batch_analysis.py`는 Watchlist Batch prompt·응답 검증과 Gemini adapter를 담당합니다.
 
 ### Storage
 
@@ -80,6 +87,10 @@ sequenceDiagram
 ```
 
 기본 Quote 실행은 Collection 흐름을 사용하고, `--save-db`에서만 저장을 수행합니다. `--show-movement`와 `--analyze`는 새로운 Quote를 수집하지 않고 저장된 snapshot을 사용합니다.
+
+Watchlist `--analyze`는 eligible symbol을 하나의 Batch 요청으로 분석합니다. 결과가 모두 저장 가능한
+상태이면 `insight_artifact.py`가 production 또는 test artifact를 저장합니다. Dashboard는 production
+artifact를 read-only로 읽고, 선택 symbol과 정확히 일치하는 Insight만 표시합니다.
 
 ## Dependency Direction
 

@@ -36,7 +36,8 @@
 | 6 | DevOps and Operations | 검증, 배포, cron 운영과 장애 확인 | 35~45쪽 | 중급 |
 | 7 | Case Study: namuwiki_trend | Sprint 순서로 전체 프로젝트 재구성 | 50~70쪽 | 종합 |
 
-예상 본문 분량은 약 285~365쪽이며, 현재 Sprint에서는 목차만 설계한다.
+이 문서는 학습 Roadmap입니다. Chapter 순서와 선수 개념, Concept 문서 링크,
+실제 코드 탐색 경로를 제공하며, 상세한 개념 설명은 `docs/concepts/`에 둡니다.
 
 ---
 
@@ -51,6 +52,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 모듈, 패키지, import, 공개 API와 파일 구조를 구분함
 - 예상 읽기 시간: 25분
 - 연결 코드: `namuwiki_trend/__init__.py`, `config.py`, `models.py`
+- 관련 Concept: [Python Project Structure](../concepts/python-project-structure.md)
 
 ## Chapter 2. Virtual Environment와 의존성
 
@@ -59,6 +61,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: `.venv`, Python interpreter, 재현 가능한 설치의 필요성을 이해함
 - 예상 읽기 시간: 30분
 - 연결 코드: `.venv/`, `pyproject.toml`, `.gitignore`
+- 관련 Concept: [Python Project Structure](../concepts/python-project-structure.md#virtual-environment)
 
 ## Chapter 3. `pyproject.toml`과 Package 설계
 
@@ -67,6 +70,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 프로젝트 metadata, dependencies, dev dependencies와 flat layout을 설계함
 - 예상 읽기 시간: 35분
 - 연결 코드: `pyproject.toml`, `namuwiki_trend/`, `google_finance/`
+- 관련 Concept: [Python Project Structure](../concepts/python-project-structure.md)
 
 ## Chapter 4. Type Hint와 데이터 계약
 
@@ -75,6 +79,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: Type Hint가 협업 계약과 오류 발견에 미치는 영향을 이해함
 - 예상 읽기 시간: 35분
 - 연결 코드: `models.py`, `pipeline.py`, `enricher.py`
+- 관련 Concept: [Python Data Contracts](../concepts/python-data-contracts.md#type-hint)
 
 ## Chapter 5. `dataclass`, 불변성, `Pathlib`
 
@@ -83,6 +88,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 모델 불변성, 명시적 데이터 구조와 플랫폼 독립 경로 처리를 사용함
 - 예상 읽기 시간: 40분
 - 연결 코드: `models.py`, `insight_storage.py`, `main.py`
+- 관련 Concept: [Python Data Contracts](../concepts/python-data-contracts.md#dataclass)
 
 ## Chapter 6. Exception과 Logging
 
@@ -91,6 +97,9 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 예외를 숨기지 않고 경계별로 전달·기록하는 방법을 설계함
 - 예상 읽기 시간: 40분
 - 연결 코드: `collector.py`, `news_context_provider.py`, `main.py`, `config.py`
+- 관련 Concept: [Error Handling and Resilience](../concepts/error-handling-and-resilience.md)
+- 관련 Concept: [Testing Fundamentals and Test Doubles](../concepts/testing-fundamentals-and-test-doubles.md)
+- 관련 Concept: [Process, Shell and Operations](../concepts/process-shell-and-operations.md)
 
 ---
 
@@ -105,6 +114,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: Model, Provider, Application, Storage의 변경 이유를 분리함
 - 예상 읽기 시간: 40분
 - 연결 코드: `collector.py`, `enricher.py`, `pipeline.py`, `insight_storage.py`
+- 관련 Concept: [Software Design Foundations](../concepts/software-design-foundations.md)
 
 ## Chapter 8. Interface와 Protocol
 
@@ -113,6 +123,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 구체 클래스가 아닌 필요한 동작에 의존하는 구조를 이해함
 - 예상 읽기 시간: 35분
 - 연결 코드: `pipeline.py`, `enricher.py`, `main.py`
+- 관련 Concept: [Protocol and Dependency Injection](../concepts/protocol-and-dependency-injection.md)
 
 ## Chapter 9. Dependency Injection과 Composition Root
 
@@ -121,6 +132,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 의존성 생성 위치와 주입 위치를 분리하고 Fake를 연결함
 - 예상 읽기 시간: 40분
 - 연결 코드: `main.py`, `pipeline.py`, `tests/namuwiki_trend/test_main.py`
+- 관련 Concept: [Protocol and Dependency Injection](../concepts/protocol-and-dependency-injection.md)
 
 ## Chapter 10. Pipeline과 Application Orchestration
 
@@ -129,6 +141,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 순서 보존, fail-fast, 빈 결과 정책을 Application Layer에 표현함
 - 예상 읽기 시간: 40분
 - 연결 코드: `pipeline.py`, `enricher.py`, `main.py`
+- 관련 Concept: [Pipeline, Provider and Storage](../concepts/pipeline-provider-storage.md)
 
 ## Chapter 11. Repository·Storage Pattern과 Output Contract
 
@@ -137,6 +150,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: 원본 CSV와 Enriched JSON의 소비 목적을 분리하고 schema를 관리함
 - 예상 읽기 시간: 40분
 - 연결 코드: `csv_storage.py`, `insight_storage.py`, `../architecture.md`
+- 관련 Concept: [Pipeline, Provider and Storage](../concepts/pipeline-provider-storage.md)
 
 ## Chapter 12. Clean Architecture와 과도한 추상화
 
@@ -159,6 +173,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 장기 누적 데이터에서 파일 저장과 관계형 DB의 차이를 이해함
 - 예상 읽기 시간: 35분
 - 연결 코드: `docker-compose.yml`, `database/`, `../../README.md`
+- 관련 Concept: [Relational Database Design](../concepts/relational-database-design.md), [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ### Chapter 12.2. SQLAlchemy ORM과 Entity Mapping
 
@@ -167,6 +182,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: Python 객체와 테이블·컬럼·제약조건을 매핑함
 - 예상 읽기 시간: 45분
 - 연결 코드: `database/base.py`, `database/models.py`
+- 관련 Concept: [Domain and Persistence Models](../concepts/domain-and-persistence-models.md), [Relational Database Design](../concepts/relational-database-design.md)
 
 ### Chapter 12.3. Session, Transaction, Commit과 Rollback
 
@@ -175,6 +191,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: Top10 일부만 저장되는 부분 상태를 transaction으로 방지함
 - 예상 읽기 시간: 40분
 - 연결 코드: `database/session.py`, `database/snapshot_save_service.py`, `tests/database/`
+- 관련 Concept: [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ### Chapter 12.4. Alembic Migration
 
@@ -183,6 +200,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: ORM schema와 실제 DB schema를 version control함
 - 예상 읽기 시간: 35분
 - 연결 코드: `alembic.ini`, `alembic/env.py`, `alembic/versions/`
+- 관련 Concept: [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ### Chapter 12.5. UTC 저장과 KST 업무 날짜
 
@@ -191,6 +209,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 저장 표준과 사용자 표시·집계 timezone을 분리함
 - 예상 읽기 시간: 35분
 - 연결 코드: `database/models.py`, `namuwiki_trend/snapshot_main.py`, `../architecture.md`
+- 관련 Concept: [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ### Chapter 12.6. Append-only Snapshot
 
@@ -199,6 +218,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 변경 가능한 현재 상태와 수집 이력 보존 모델의 차이를 이해함
 - 예상 읽기 시간: 30분
 - 연결 코드: `database/models.py`, `database/snapshot_save_service.py`
+- 관련 Concept: [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ### Chapter 12.7. Query, Aggregation, Read Model
 
@@ -207,6 +227,8 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 저장 Entity와 조회 전용 결과 타입을 분리하고 deterministic ranking을 설계함
 - 예상 읽기 시간: 45분
 - 연결 코드: `database/daily_trend_query.py`, `tests/database/test_daily_trend_query.py`
+- 관련 Concept: [Relational Database Design](../concepts/relational-database-design.md)
+- 관련 문서: [Database Learning](../database/database_learning.md), [Database Architecture](../database/database_architecture.md)
 
 ### Chapter 12.8. MySQL 문자셋과 Client Encoding
 
@@ -215,6 +237,8 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 저장 데이터와 CLI 표시 인코딩 문제를 구분하고 utf8mb4 접속을 검증함
 - 예상 읽기 시간: 25분
 - 연결 코드: `../../README.md`, `docker-compose.yml`, `tests/database/`
+- 관련 Concept: [Relational Database Design](../concepts/relational-database-design.md)
+- 관련 문서: [Database Architecture](../database/database_architecture.md)
 
 # Part 3. Web Crawling and Browser Automation
 
@@ -227,6 +251,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: HTTP status, header, payload, GET과 POST의 역할을 구분함
 - 예상 읽기 시간: 35분
 - 연결 코드: `news_context_provider.py`, `collector.py`
+- 관련 Concept: [HTTP, REST API, JSON and External API](../concepts/http-rest-json-external-api.md)
 
 ## Chapter 14. HTML, DOM, View Source
 
@@ -235,6 +260,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 초기 HTML과 JavaScript 이후 DOM이 달라지는 이유를 이해함
 - 예상 읽기 시간: 35분
 - 연결 코드: `namu.html`, `collector.py`, `../poc/playwright-preparation.md`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 15. CSR, SSR, Dynamic Rendering
 
@@ -243,6 +269,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 데이터 생성 위치가 수집 도구 선택에 미치는 영향을 분석함
 - 예상 읽기 시간: 30분
 - 연결 코드: `collector.py`, `playwright_poc.py`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 16. DevTools Network와 Evidence 기반 조사
 
@@ -251,6 +278,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: Fetch/XHR, Response, Initiator를 확인하고 API를 추측하지 않음
 - 예상 읽기 시간: 40분
 - 연결 코드: `STUDY_NOTE.md`의 과거 조사 기록, `../poc/playwright-preparation.md`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 17. CSS Selector, Locator, XPath
 
@@ -259,6 +287,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 실제 구조에 기반한 안정적 Locator를 선택하고 fallback을 남용하지 않음
 - 예상 읽기 시간: 40분
 - 연결 코드: `collector.py`, `extraction.py`, `playwright_poc.py`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 18. requests와 BeautifulSoup
 
@@ -267,6 +296,8 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 정적 HTML 파싱의 장점과 동적 사이트의 한계를 판단함
 - 예상 읽기 시간: 30분
 - 연결 코드: `news_context_provider.py`, `pyproject.toml`
+- 관련 Concept: [HTTP, REST API, JSON and External API](../concepts/http-rest-json-external-api.md)
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 19. Playwright와 Chromium
 
@@ -275,6 +306,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: Headless browser, BrowserContext, 대기와 종료를 안전하게 관리함
 - 예상 읽기 시간: 45분
 - 연결 코드: `collector.py`, `playwright_poc.py`, `namu.html`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ---
 
@@ -289,6 +321,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: RSS field, parsing, URL 검증과 뉴스 문맥의 한계를 이해함
 - 예상 읽기 시간: 40분
 - 연결 코드: `news_context_provider.py`, `news_context_poc.py`
+- 관련 Concept: [HTTP, REST API, JSON and External API](../concepts/http-rest-json-external-api.md)
 
 ## Chapter 21. LLM Provider와 Prompt Builder
 
@@ -313,6 +346,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 최소 요청 간격, 429 제한 재시도, RetryInfo와 exponential backoff를 설계함
 - 예상 읽기 시간: 45분
 - 연결 코드: `gemini_reason_generator.py`, `main.py`
+- 관련 Concept: [Error Handling and Resilience](../concepts/error-handling-and-resilience.md)
 
 ## Chapter 24. Clock Injection과 시간 의존성
 
@@ -335,6 +369,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: test discovery, assertion, parametrization과 실패 읽기를 익힘
 - 예상 읽기 시간: 35분
 - 연결 코드: `tests/`, `pyproject.toml`
+- 관련 Concept: [Testing Fundamentals and Test Doubles](../concepts/testing-fundamentals-and-test-doubles.md)
 
 ## Chapter 26. Fake, Mock, Fixture, MonkeyPatch
 
@@ -343,6 +378,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 외부 API 없이 Provider, Gemini, Pipeline을 검증함
 - 예상 읽기 시간: 45분
 - 연결 코드: `tests/namuwiki_trend/test_enricher.py`, `test_main.py`
+- 관련 Concept: [Testing Fundamentals and Test Doubles](../concepts/testing-fundamentals-and-test-doubles.md)
 
 ## Chapter 27. Unit Verification과 Live Verification
 
@@ -351,6 +387,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 재현 가능한 단위 테스트와 quota를 소비하는 Live 검증을 분리함
 - 예상 읽기 시간: 35분
 - 연결 코드: `scripts/verify.py`, `../../README.md`, `../architecture.md`
+- 관련 Concept: [Testing Fundamentals and Test Doubles](../concepts/testing-fundamentals-and-test-doubles.md)
 
 ## Chapter 28. Quality Diagnostics와 Heuristic
 
@@ -381,6 +418,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 정적 검사·테스트·컴파일·diff 검사를 하나의 Harness로 실행함
 - 예상 읽기 시간: 30분
 - 연결 코드: `scripts/verify.py`, `tests/test_verify.py`
+- 관련 Concept: [Testing Fundamentals and Test Doubles](../concepts/testing-fundamentals-and-test-doubles.md)
 
 ## Chapter 31. Shell Script와 실행 경계
 
@@ -389,6 +427,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: root 계산, 환경변수, exit code, stdout/stderr를 운영 경계에 배치함
 - 예상 읽기 시간: 35분
 - 연결 코드: `run_namuwiki_trend.sh`
+- 관련 Concept: [Process, Shell and Operations](../concepts/process-shell-and-operations.md)
 
 ## Chapter 32. Linux, WSL, cron
 
@@ -397,6 +436,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: cron 표현식, WSL 지속성, daemon과 사용자 crontab을 이해함
 - 예상 읽기 시간: 40분
 - 연결 코드: `../../README.md`, `../architecture.md`, `run_namuwiki_trend.sh`
+- 관련 Concept: [Process, Shell and Operations](../concepts/process-shell-and-operations.md)
 
 ## Chapter 33. Logging, Monitoring, Debugging
 
@@ -405,6 +445,8 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: 로그에서 실행 상태·실패 원인·소요 시간을 관찰함
 - 예상 읽기 시간: 40분
 - 연결 코드: `config.py`, `run_namuwiki_trend.sh`, `logs/`
+- 관련 Concept: [Error Handling and Resilience](../concepts/error-handling-and-resilience.md)
+- 관련 Concept: [Process, Shell and Operations](../concepts/process-shell-and-operations.md)
 
 ## Chapter 34. Git, GitHub, Conventional Commit
 
@@ -457,6 +499,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 난이도: 중급~고급
 - 핵심 질문: Free Tier quota 실패를 어느 계층에서 해결했는가
 - 연결 코드: `gemini_reason_generator.py`, Live 실행 기록
+- 관련 Concept: [Error Handling and Resilience](../concepts/error-handling-and-resilience.md)
 
 ## Chapter 41. Sprint 6 — Quality Diagnostics
 
@@ -469,15 +512,16 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 난이도: 중급
 - 핵심 질문: 개발 명령을 반복 가능한 운영 실행으로 어떻게 감싸는가
 - 연결 코드: `run_namuwiki_trend.sh`, `../../README.md`, `../architecture.md`
+- 관련 Concept: [Process, Shell and Operations](../concepts/process-shell-and-operations.md)
 
-## Chapter 43. Sprint 3 — MySQL Snapshot Persistence
+## Chapter 43. Sprint 8 — MySQL Snapshot Persistence
 
 - 상태: 구현 완료
 - 핵심 질문: 왜 원본 순위 데이터를 append-only DB snapshot으로 보존했는가
 - 연결 코드: `database/models.py`, `alembic/`, `database/snapshot_save_service.py`,
   `namuwiki_trend/snapshot_main.py`
 
-## Chapter 44. Sprint 4 — Daily Trend Query
+## Chapter 44. Sprint 9 — Daily Trend Query
 
 - 상태: 조회 서비스 구현 완료, 집계 결과 저장과 전용 CLI는 미구현
 - 핵심 질문: KST 업무 날짜의 반복 출현과 순위를 어떻게 SQL로 요약하는가

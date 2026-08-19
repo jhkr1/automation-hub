@@ -22,7 +22,7 @@
 
 ## Repository Overview
 
-Repository는 두 개의 Automation Package와 Root 수준의 Database, Tests, Scripts, Documentation으로 구성됩니다.
+Repository는 세 개의 Automation Package와 Root 수준의 Database, Tests, Scripts, Documentation으로 구성됩니다.
 
 ```mermaid
 flowchart TD
@@ -37,6 +37,7 @@ flowchart TD
 |---|---|---|
 | `google_finance/` | `main.py`, `watchlist_main.py` | 단일 종목·Watchlist 실행 진입점 |
 | `namuwiki_trend/` | `main.py`, `snapshot_main.py`, `daily_trend_main.py` | 수집·Snapshot·Daily Trend 실행 진입점 |
+| `bus_monitor/` | `main.py`, `pipeline.py`, `odsay.py`, `gyeonggi.py`, `storage.py` | target 기반 route·realtime 수집과 snapshot 저장 흐름 |
 | `database/` | `base.py`, `session.py`, `models.py` | DB 기반과 현재 DB 관련 코드 |
 | `tests/` | Package별 테스트 디렉터리 | 공개 동작과 실패 계약 확인 |
 | `scripts/` | `verify.py` | Repository 공통 검증 |
@@ -48,6 +49,7 @@ flowchart TD
 |---|---|---|
 | Google Finance Quote·Snapshot·Movement·Analysis·Watchlist | `google_finance` | `google_finance/main.py` 또는 `google_finance/watchlist_main.py` |
 | Namuwiki Top 10·Enrichment·Snapshot·Daily Trend | `namuwiki_trend` | `namuwiki_trend/main.py`, `snapshot_main.py`, `daily_trend_main.py` |
+| Bus Monitor target route·realtime·snapshot | `bus_monitor` | `bus_monitor/main.py` |
 | DB 공통 기반 또는 DB 관련 동작 확인 | Root `database` | 사용 중인 호출부와 관련 테스트부터 확인 |
 | 공통 검증 명령 변경 | Root Scripts | `scripts/verify.py` |
 
@@ -72,6 +74,7 @@ Package의 현재 기능과 실행 조건은 Package README가 기준입니다. 
 - Namuwiki 기본 흐름: `namuwiki_trend/main.py`
 - Namuwiki Snapshot: `namuwiki_trend/snapshot_main.py`
 - Namuwiki Daily Trend: `namuwiki_trend/daily_trend_main.py`
+- Bus Monitor persisted target: `bus_monitor/main.py --target-id <id>`
 
 ### 4. 호출 파일 따라가기
 
@@ -92,7 +95,7 @@ flowchart TD
 
 ### 6. 문서와 기록 대조
 
-설계 이유는 [Root Architecture](docs/architecture.md)와 Package Architecture를 확인합니다. 장기 결정은 [ADR](docs/decisions/README.md), 변경 과정은 [DEV_LOG](docs/development/DEV_LOG.md)에서 확인합니다.
+설계 이유는 [Root Architecture](docs/architecture.md)와 Package Architecture를 확인합니다. 장기 결정은 [Decision Records](docs/decisions/README.md)와 [LLM ADRs](docs/adr/ADR-0007-llm-runtime.md), 변경 과정은 [DEV_LOG](docs/development/DEV_LOG.md)에서 확인합니다.
 
 ## Repository Structure
 
@@ -116,6 +119,12 @@ Google Finance 기능과 실행 모듈입니다. 먼저 Entrypoint를 연 뒤 �
 
 Namuwiki 수집과 활용 흐름의 모듈입니다. 실행 목적에 따라 `main.py`, `snapshot_main.py`, `daily_trend_main.py` 중 하나를 선택합니다.
 
+### `bus_monitor/`
+
+좌표가 저장된 monitoring target을 ODsay route planning과 경기도 realtime API로 조회하는 모듈입니다.
+`main.py`에서 target 실행을 시작한 뒤 `pipeline.py`, `odsay.py`, `gyeonggi.py`, `storage.py` 순서로
+따라가면 route·realtime·snapshot 경계를 확인할 수 있습니다.
+
 ### `database/`
 
 DB 기반과 현재 DB 모델·조회·저장 보조 코드가 있는 위치입니다. 이 디렉터리의 파일을 공통 코드라고 가정하지 말고, 실제 호출부와 테스트를 함께 확인합니다.
@@ -124,6 +133,7 @@ DB 기반과 현재 DB 모델·조회·저장 보조 코드가 있는 위치입�
 
 - `tests/google_finance/`: Google Finance 단위·Application·CLI 테스트
 - `tests/namuwiki_trend/`: Namuwiki 수집·변환·Enrichment·CLI 테스트
+- `tests/bus_monitor/`: ODsay·경기도 Provider, pipeline, target CLI와 storage 테스트
 - `tests/database/`: DB 모델·조회·저장 및 Integration 테스트
 
 ### `scripts/`
@@ -140,7 +150,7 @@ DB 기반과 현재 DB 모델·조회·저장 보조 코드가 있는 위치입�
 | Package 실행 방법 | [Package README](docs/packages/) |
 | Package 내부 설계 | [Package Architecture](docs/packages/) |
 | 운영 환경 | [Operations](docs/operations/README.md) |
-| 장기 설계 결정 | [ADR](docs/decisions/README.md) |
+| 장기 설계 결정 | [Decision Records](docs/decisions/README.md), [LLM ADRs](docs/adr/ADR-0007-llm-runtime.md) |
 | 개발 이력 | [DEV_LOG](docs/development/DEV_LOG.md) |
 | 설계 학습 | [Architecture Handbook](docs/handbook/README.md) |
 
@@ -152,6 +162,7 @@ DB 기반과 현재 DB 모델·조회·저장 보조 코드가 있는 위치입�
 |---|---|
 | `google_finance/<module>.py` | `tests/google_finance/test_<module>.py` |
 | `namuwiki_trend/<module>.py` | `tests/namuwiki_trend/test_<module>.py` |
+| `bus_monitor/<module>.py` | `tests/bus_monitor/test_<module>.py`, 필요 시 `tests/database/test_bus_monitor_integration.py` |
 | `database/<module>.py` | `tests/database/`의 대응 테스트 |
 | CLI Entrypoint | Package의 `test_main.py` 또는 대응 CLI 테스트 |
 | 외부·DB 경계 | Fake 테스트와 관련 Integration 테스트 |

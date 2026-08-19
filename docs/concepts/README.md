@@ -37,6 +37,47 @@ Python 문법보다 설계 판단, 책임 경계, 데이터 흐름과 외부 의
 | Part 6 | Defining Test Boundaries | 16~18 | 테스트 수준별로 증명되는 범위와 한계 |
 | Part 7 | Operating an Automation System | 19~21 | 반복 실행 자동화의 설정, 관찰, 동시성 문제 |
 
+`STUDY_NOTE`는 학습 순서와 코드 탐색 경로를 안내하고, 이 디렉터리는 상세한 개념 설명을
+제공합니다. 기존 Concepts Chapter 번호(Collector 1~Logging 21)와 `STUDY_NOTE` Chapter
+번호는 서로 다른 학습 목차이므로 혼동하지 않습니다.
+
+문서는 두 역할로 나뉩니다.
+
+- **Canonical Concept**: `provider.md`, `domain-model.md`, `unit-test.md`처럼 하나의 개념을
+  집중적으로 설명하는 기준 문서입니다.
+- **Integrated Learning Guide**: Sprint B~J 문서처럼 여러 개념을 실제 `automation-hub`
+  흐름과 연결해 학습하는 통합 안내서입니다. Canonical 문서를 대체하거나 삭제하지 않습니다.
+
+처음 읽는다면 다음 순서를 권장합니다.
+
+1. [Python Project Structure](python-project-structure.md)
+2. [Python Data Contracts](python-data-contracts.md)
+3. [Software Design Foundations](software-design-foundations.md)
+4. [Protocol and Dependency Injection](protocol-and-dependency-injection.md)
+5. [Pipeline, Provider and Storage](pipeline-provider-storage.md)
+6. [Domain and Persistence Models](domain-and-persistence-models.md)
+7. [Relational Database Design](relational-database-design.md)
+8. [HTTP, REST API, JSON and External API](http-rest-json-external-api.md)
+9. [Error Handling and Resilience](error-handling-and-resilience.md)
+10. [Testing Fundamentals and Test Doubles](testing-fundamentals-and-test-doubles.md)
+11. [Process, Shell and Operations](process-shell-and-operations.md)
+
+| 보충 문서 | 다루는 범위 |
+|---|---|
+| [Python Project Structure](python-project-structure.md) | source file, module, package, import, virtual environment, dependency, `pyproject.toml` |
+| [Python Data Contracts](python-data-contracts.md) | type hint, dataclass, Enum, optional value, `Path`, provider-to-domain contract |
+| [Software Design Foundations](software-design-foundations.md) | responsibility, separation of concerns, coupling, cohesion, abstraction, boundary |
+| [Protocol and Dependency Injection](protocol-and-dependency-injection.md) | interface, Protocol, dependency, DIP, DI, Composition Root |
+| [Pipeline, Provider and Storage](pipeline-provider-storage.md) | orchestration, Provider, Pipeline, Storage, Repository와 application flow |
+| [Domain and Persistence Models](domain-and-persistence-models.md) | Domain Model, DTO, Persistence Model, ORM Model과 변환 경계 |
+| [SQLAlchemy Session, Transaction and Migration](sqlalchemy-session-transaction-migration.md) | Session, flush, commit, rollback, Transaction, Snapshot, UTC/KST, Alembic |
+| [Relational Database Design](relational-database-design.md) | PK/FK, 관계, constraint, index, query와 Bus Monitor schema 판단 |
+| [HTTP, REST API, JSON and External API](http-rest-json-external-api.md) | HTTP request/response, JSON 경계, requests, 인증과 Provider 정규화 |
+| [Web, DOM and Browser Automation](web-dom-browser-automation.md) | HTML, DOM, CSS selector, SSR/CSR, scraping과 Playwright 선택 |
+| [Error Handling and Resilience](error-handling-and-resilience.md) | Exception boundary, timeout, retry, quota, partial success와 exit code |
+| [Testing Fundamentals and Test Doubles](testing-fundamentals-and-test-doubles.md) | Unit/Integration/Live 경계, Fake/Mock/Fixture와 verification |
+| [Process, Shell and Operations](process-shell-and-operations.md) | Process, wrapper, environment, PATH, cron, flock, timeout과 logging |
+
 ```mermaid
 flowchart TD
     External[External Data] --> Collection[Part 1. Collection and Modeling]
@@ -78,6 +119,28 @@ flowchart TD
 
 기본 경로는 Chapter 1부터 21까지 순서대로 읽는 것입니다. 각 Chapter는 앞 단계에서 생긴 문제를 다음 개념으로 해결하도록 구성합니다.
 
+Python 프로젝트를 처음 읽는 독자는 먼저 [Python Project Structure](python-project-structure.md)와
+[Python Data Contracts](python-data-contracts.md)를 읽은 뒤 이 책의 Collector Chapter로 이동합니다.
+Architecture를 읽을 때는 [Software Design Foundations](software-design-foundations.md),
+[Protocol and Dependency Injection](protocol-and-dependency-injection.md),
+[Pipeline, Provider and Storage](pipeline-provider-storage.md) 순서를 따릅니다.
+Persistence를 읽을 때는 [Domain and Persistence Models](domain-and-persistence-models.md)에서
+도메인과 저장 모델을 구분하고, [Relational Database Design](relational-database-design.md)에서
+PK/FK·constraint·index·query를 실제 schema와 연결한 뒤,
+[SQLAlchemy Session, Transaction and Migration](sqlalchemy-session-transaction-migration.md)으로
+이동한 뒤 기존 [Database Learning](../database/database_learning.md)을 세부 Reference로 사용합니다.
+
+Web/API를 읽을 때는 [HTTP, REST API, JSON and External API](http-rest-json-external-api.md)에서
+HTTP와 JSON 경계를 먼저 익힌 뒤 Provider 문서와 실제 integration code를 읽습니다.
+Browser 수집은 [Web, DOM and Browser Automation](web-dom-browser-automation.md)에서
+초기 HTML과 최종 DOM의 차이를 이해한 뒤 실제 collector를 읽습니다.
+실패 처리는 [Error Handling and Resilience](error-handling-and-resilience.md)에서
+Provider 예외, Domain status, CLI/cron exit code의 경계를 연결합니다.
+Testing은 [Testing Fundamentals and Test Doubles](testing-fundamentals-and-test-doubles.md)에서
+Fake와 실제 외부 시스템의 검증 범위를 구분한 뒤 관련 테스트를 읽습니다.
+운영 실행은 [Process, Shell and Operations](process-shell-and-operations.md)에서
+Program/Process와 wrapper·cron·환경의 관계를 이해한 뒤 운영 문서를 읽습니다.
+
 | 목적 | 읽기 경로 | 건너뛸 때 놓치는 내용 |
 |---|---|---|
 | 빠른 프로젝트 구조 이해 | 1 → 2 → 3 → 4 → 5 → 6 | 저장, 의존성, 테스트와 운영의 후속 경계를 다루지 않음 |
@@ -103,6 +166,18 @@ flowchart TD
 
 ## Start Reading
 
+- [Python Project Structure](python-project-structure.md): `automation-hub`의 package, import와 실행 환경을 읽는 기초입니다.
+- [Python Data Contracts](python-data-contracts.md): 외부 값을 dataclass·Enum 기반 내부 계약으로 바꾸는 기초입니다.
+- [Software Design Foundations](software-design-foundations.md): 책임·결합·응집·경계를 작은 예제로 이해합니다.
+- [Protocol and Dependency Injection](protocol-and-dependency-injection.md): Protocol과 생성자 주입을 실제 wiring과 연결합니다.
+- [Pipeline, Provider and Storage](pipeline-provider-storage.md): Bus Monitor와 다른 package의 application 흐름을 비교합니다.
+- [Domain and Persistence Models](domain-and-persistence-models.md): Python 업무 객체가 저장 모델로 바뀌는 경계를 이해합니다.
+- [SQLAlchemy Session, Transaction and Migration](sqlalchemy-session-transaction-migration.md): 객체 저장, Transaction, Snapshot과 schema 이력을 연결합니다.
+- [HTTP, REST API, JSON and External API](http-rest-json-external-api.md): HTTP 요청, JSON 정규화, API key와 Provider 경계를 이해합니다.
+- [Web, DOM and Browser Automation](web-dom-browser-automation.md): HTML, DOM, 동적 렌더링과 Playwright 선택을 이해합니다.
+- [Error Handling and Resilience](error-handling-and-resilience.md): 예외, timeout, retry, partial success와 운영 exit code를 이해합니다.
+- [Testing Fundamentals and Test Doubles](testing-fundamentals-and-test-doubles.md): Unit/Integration/Live 테스트와 대역 객체의 경계를 이해합니다.
+- [Process, Shell and Operations](process-shell-and-operations.md): Process, Shell, 환경변수와 cron/flock 실행 경계를 이해합니다.
 - [Chapter 1. Collector](collector.md#chapter-1-collector): 외부 시스템과 내부 데이터 사이의 첫 경계를 이해합니다.
 - [Chapter 2. Parser and Extraction](parser.md#chapter-2-parser-and-extraction): 원시 표현을 검증하고 변환하는 방법을 이해합니다.
 - [Chapter 3. Domain Model](domain-model.md#chapter-3-domain-model): 변환된 데이터에 업무 의미를 부여하는 방법을 이해합니다.

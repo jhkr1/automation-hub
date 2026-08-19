@@ -1,7 +1,8 @@
 # Cron 운영 가이드
 
 이 문서는 `automation-hub`의 Wrapper를 Linux cron에서 실행하기 위한 운영 기준을
-정리한다. 실제 crontab을 등록하지 않으며, 아래 Schedule은 권장안이다.
+정리한다. 아래 absolute path는 현재 운영 host의 `/home/kstec/projects/automation-hub` 예시이며,
+다른 host에서는 `<project-root>`로 바꿔야 한다. 이 문서가 cron을 등록하거나 변경하지는 않는다.
 
 ## Job 목록
 
@@ -16,7 +17,10 @@
 Package의 실행 방법과 결과 계약은 [Google Finance 운영 문서](google_finance.md)와
 [Namuwiki 운영 문서](namuwiki_trend.md)를 기준으로 한다.
 
-## 권장 Schedule
+## 현재 host Schedule과 일반 형식
+
+현재 host의 crontab에는 아래 schedule이 등록되어 있다. Bus Monitor의 target 2 수집은 평일
+`0,10,20 17 * * 1-5`로 등록되어 있다.
 
 ```cron
 SHELL=/bin/bash
@@ -36,6 +40,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Bus Monitor target 2: 평일 17:00, 17:10, 17:20
 0,10,20 17 * * 1-5 /home/kstec/projects/automation-hub/run_bus_monitor.sh
+```
+
+다른 host에서는 같은 expression을 유지하고 경로만 다음 일반 형식으로 바꾼다.
+
+```cron
+0,10,20 17 * * 1-5 <project-root>/run_bus_monitor.sh
 ```
 
 08:00 Google Finance collect가 먼저 DB에 Snapshot을 저장하고, 08:10 analyze는 저장된
@@ -133,7 +143,8 @@ signal 이후 Browser 또는 Python 자식 프로세스가 남지 않는지 확�
 
 ## 로그와 종료 코드
 
-Wrapper 로그는 다음 절대 경로 아래에 생성된다.
+현재 host의 Wrapper 로그는 다음 절대 경로 아래에 생성된다. 다른 host에서는
+`<project-root>/logs/` 아래의 같은 파일명을 사용한다.
 
 ```text
 /home/kstec/projects/automation-hub/logs/google_finance_wrapper.log

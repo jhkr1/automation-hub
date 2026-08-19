@@ -7,11 +7,14 @@
 | 문서 유형 | 학습 Hub |
 | 대상 독자 | Python 기본 문법은 알지만 Architecture 경험이 적은 개발자 |
 | 권장 읽기 순서 | Chapter 1부터 Chapter 8까지 |
-| 정확한 구현 Reference | Package Architecture |
+| 정확한 구현 Reference | Package Architecture 및 CODE_FLOW |
 
 ## 이 Handbook은 무엇인가
 
-이 Handbook은 `automation-hub`의 실제 개발 사례를 사용하는 Architecture 학습 문서입니다. Repository 사용법이나 정확한 구현 Reference가 아니며, 특정 폴더 구조를 그대로 복사하는 것을 목표로 하지 않습니다.
+이 Handbook은 `automation-hub`의 실제 개발 사례를 사용하는 Architecture Case Study입니다.
+Concepts가 “이 개념은 무엇인가?”를 설명한다면, Handbook은 “이 프로젝트에서는 왜 이런
+선택을 했는가?”를 설계 과정과 Trade-off를 통해 설명합니다. Repository 사용법이나 정확한
+구현 Reference가 아니며, 특정 폴더 구조를 그대로 복사하는 것을 목표로 하지 않습니다.
 
 문제, 선택, 구현과 Trade-off를 따라가며 상황에 맞는 설계 판단을 학습합니다. 현재 Repository의 사실과 다른 프로젝트에도 적용할 수 있는 일반 원칙을 구분해서 읽어야 합니다.
 
@@ -79,7 +82,9 @@ Chapter 4와 Chapter 5를 건너뛰면 Business Rule의 독립성과 Persistence
 
 - Repository 파일명은 각 설계 설명의 사례 근거입니다.
 - 일반적인 Architecture 원칙과 현재 Repository의 선택을 구분해서 읽습니다.
-- 정확한 현재 구현은 [Google Finance Architecture](../packages/google_finance/architecture.md)와 [Namuwiki Architecture](../packages/namuwiki_trend/architecture.md)를 기준으로 확인합니다.
+- 정확한 현재 구현은 각 Package README와 Architecture/CODE_FLOW 문서를 기준으로 확인합니다.
+- Bus Monitor는 [Package README](../packages/bus_monitor/README.md), [CODE_FLOW](../packages/bus_monitor/CODE_FLOW.md),
+  [Architecture Decisions](../architecture/bus_monitor_decisions.md)를 함께 확인합니다.
 - 과거의 live 실행 결과는 현재의 영구적인 보장을 의미하지 않습니다.
 
 ## Start Reading
@@ -92,6 +97,7 @@ Chapter 4와 Chapter 5를 건너뛰면 Business Rule의 독립성과 Persistence
 - [Root Architecture](../architecture.md): Monorepo 전체 구조와 공통 책임을 확인합니다.
 - [Google Finance Architecture](../packages/google_finance/architecture.md): Google Finance의 정확한 설계 Reference를 확인합니다.
 - [Namuwiki Architecture](../packages/namuwiki_trend/architecture.md): Namuwiki Trend의 정확한 설계 Reference를 확인합니다.
+- [Bus Monitor README](../packages/bus_monitor/README.md): ODsay + Gyeonggi production 흐름을 확인합니다.
 - [STYLE_GUIDE](STYLE_GUIDE.md): Handbook 집필 규칙입니다. 일반 독자용 Chapter가 아닙니다.
 
 ## Next Reading

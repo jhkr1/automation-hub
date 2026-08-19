@@ -18,6 +18,7 @@
 | Log to File | Python logging 또는 실행 Wrapper | 구조와 운영 경계를 문서화한다. |
 | Scheduler | cron 또는 외부 Scheduler | 패키지 Application과 스케줄러를 분리한다. |
 
-`namuwiki_trend`에서는 Playwright Collector, 순수 extraction 함수, Pipeline, Model,
-Storage를 분리한 사례가 확인되어 있다. Google Finance의 수집 방식은 아직 확인되지
-않았으므로 이 표의 특정 구현을 적용한 것으로 간주하지 않는다.
+`namuwiki_trend`와 `google_finance`에는 Playwright Collector, 분리된 변환 단계와 내부 Model을
+두는 사례가 확인되어 있다. 반면 Bus Monitor production은 지도 UI를 읽지 않고 ODsay와 경기도
+공식 API Provider를 사용한다. 따라서 이 표의 UI 자동화 대응은 모든 Package의 구현 방식을
+의미하지 않으며, 실제 Provider 선택은 Package별 문서를 기준으로 확인한다.

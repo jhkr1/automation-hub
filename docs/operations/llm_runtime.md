@@ -138,7 +138,8 @@ Structured Output이 설정되어도 Package Parser의 mapping과 길이 검증�
 
 ## Batch
 
-현재 Batch 분석은 Namuwiki에만 적용되어 있다.
+현재 Batch 분석은 Namuwiki Trend와 Google Finance Watchlist에 각각 적용되어 있다. 두 Package는
+같은 Runtime을 사용하지만 prompt, 응답 schema와 결과 검증 계약은 공유하지 않는다.
 
 ```mermaid
 sequenceDiagram
@@ -160,8 +161,19 @@ sequenceDiagram
 - 응답 순서가 달라도 입력 rank 순서로 복원한다.
 - Batch 실패 시 부분 결과를 저장하지 않고 기존 `output/trend_insights.json`을 보존한다.
 
-`google_finance`는 현재 종목별 분석 Generator를 사용하며 Google Finance Batch는
-아직 구현되지 않았다.
+Google Finance의 `watchlist_main.py --analyze --key-profile <profile>`은
+`analyze_stored_quotes_batch()`와 `GeminiStockInsightBatchGenerator`를 사용해 분석 가능한
+Watchlist symbol을 하나의 Batch 요청으로 처리한다. Snapshot이 부족하거나 뉴스가 없는 symbol은
+Batch 입력에서 제외하고 각자의 결과 상태를 유지한다. 단일 symbol CLI의 `main.py --analyze`는
+별도 `GeminiStockInsightGenerator` 경로를 유지한다.
+
+Google Finance Watchlist 분석은 `FAILED` 또는 `ANALYSIS_UNAVAILABLE` 결과가 없을 때만
+profile별 JSON artifact를 원자적으로 저장한다.
+
+| Profile | Artifact path |
+|---|---|
+| Production | `output/google_finance_insights.json` |
+| Test | `output/test/google_finance_insights.json` |
 
 ## Key Profile
 
@@ -208,7 +220,7 @@ flowchart TD
 |---|---|---|
 | `.state/` | Local quota ledger와 lock 등 실행 상태 | 하지 않음 |
 | `logs/` | Wrapper와 Package 실행 로그 | 하지 않음 |
-| `output/` | Namuwiki 등 Package가 생성하는 결과 artifact | 하지 않음 |
+| `output/` | Namuwiki·Google Finance Package가 생성하는 결과 artifact | 하지 않음 |
 
 세 디렉터리는 실행 중 생성되는 로컬 상태·로그·결과 영역이다. `logs/`와 `output/`은
 현재 `.gitignore`에서 제외되지만, `.state/`는 이 문서의 운영 계약상 로컬 상태로
@@ -222,7 +234,9 @@ flowchart TD
 - 일일 quota 오류는 retry로 해결되지 않으므로 반복 실행하지 않는다.
 - Batch JSON 오류가 발생하면 기존 artifact가 보존되는지 확인한다.
 - 실제 Gemini Live smoke test는 quota reservation을 소비하므로 실행 횟수를 제한한다.
-- Dashboard에는 현재 LLM usage 표시 기능이 없다. Dashboard 확장은 후속 작업이다.
+- Dashboard Home은 local quota ledger의 profile별 당일 요청 수, retry 수와 최근 요청 시각을
+  read-only로 표시한다. Google Finance page는 production Insight artifact를, Namuwiki page는
+  Trend Insight artifact를 읽는다. Dashboard는 LLM을 호출하거나 ledger/artifact를 수정하지 않는다.
 
 ## Related Documents
 
