@@ -116,9 +116,9 @@ ORM은 Python attribute와 table column을 연결하고, 객체를 Session에서
 
 ## 9. 실제 코드를 읽는 방법
 
-1. `bus_monitor/models.py`에서 `BusRouteResult`, `TransitRoute`, `RealtimeArrival`의 업무 의미를 읽습니다.
-2. `bus_monitor/db_models.py`에서 `BusMonitoringTarget`, `BusRouteSnapshot`, `BusRouteSnapshotLane`, `BusRealtimeSnapshot`의 table·column·FK를 읽습니다.
-3. `bus_monitor/storage.py`의 `save_snapshot()`에서 domain 결과가 ORM 객체로 바뀌는 위치를 찾습니다.
+1. [`bus_monitor/models.py`](../../bus_monitor/models.py)에서 `BusRouteResult`, `TransitRoute`, `RealtimeArrival`의 업무 의미를 읽습니다.
+2. [`bus_monitor/db_models.py`](../../bus_monitor/db_models.py)에서 `BusMonitoringTarget`, `BusRouteSnapshot`, `BusRouteSnapshotLane`, `BusRealtimeSnapshot`의 table·column·FK를 읽습니다.
+3. [`bus_monitor/storage.py`](../../bus_monitor/storage.py)의 `save_snapshot()`에서 domain 결과가 ORM 객체로 바뀌는 위치를 찾습니다.
 4. `google_finance/db_models.py`의 `from_domain()`·`to_domain()`을 비교합니다.
 5. `database/base.py`의 `Base`가 모든 ORM model의 metadata를 모으는 위치임을 확인합니다.
 
@@ -156,4 +156,4 @@ ORM은 Python attribute와 table column을 연결하고, 객체를 Session에서
 
 ## 다음 읽기
 
-[SQLAlchemy Session, Transaction and Migration](sqlalchemy-session-transaction-migration.md)에서 Python 객체가 Session과 Transaction을 거쳐 DB에 저장되는 과정을 읽습니다.
+[Relational Database Design](relational-database-design.md)에서 PK/FK·index·JOIN을 먼저 읽고, [SQLAlchemy Session, Transaction and Migration](sqlalchemy-session-transaction-migration.md)에서 Python 객체가 Session과 Transaction을 거쳐 DB에 저장되는 과정을 읽습니다.

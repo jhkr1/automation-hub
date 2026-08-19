@@ -253,13 +253,13 @@ Skip은 환경 의존 테스트를 기본 suite에서 분리하는 정상적인 
 
 ## 16. 코드 읽기 순서
 
-1. `bus_monitor/pipeline.py`
-2. `tests/bus_monitor/test_pipeline.py`
-3. `bus_monitor/gyeonggi.py`
-4. `tests/bus_monitor/test_gyeonggi.py`
-5. `bus_monitor/storage.py`
-6. `tests/bus_monitor/test_storage.py`
-7. `tests/database/test_bus_monitor_integration.py`
+1. [`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py)
+2. [`tests/bus_monitor/test_pipeline.py`](../../tests/bus_monitor/test_pipeline.py)
+3. [`bus_monitor/gyeonggi.py`](../../bus_monitor/gyeonggi.py)
+4. [`tests/bus_monitor/test_gyeonggi.py`](../../tests/bus_monitor/test_gyeonggi.py)
+5. [`bus_monitor/storage.py`](../../bus_monitor/storage.py)
+6. [`tests/bus_monitor/test_storage.py`](../../tests/bus_monitor/test_storage.py)
+7. [`tests/database/test_bus_monitor_integration.py`](../../tests/database/test_bus_monitor_integration.py)
 
 각 테스트에서 Arrange/Act/Assert, Real dependency 여부, Fake 구성, 검증 범위와 미검증
 범위를 표시한다.

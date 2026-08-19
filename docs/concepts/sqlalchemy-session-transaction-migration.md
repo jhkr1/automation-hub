@@ -241,9 +241,9 @@ kst = collected_at.astimezone(ZoneInfo("Asia/Seoul"))
 
 ## 13. 실제 코드를 읽는 방법
 
-1. `bus_monitor/models.py`에서 Domain 결과와 상태를 읽습니다.
-2. `bus_monitor/db_models.py`에서 ORM table·FK·nullable·index를 읽습니다.
-3. `bus_monitor/storage.py`의 `save_snapshot()`에서 domain → ORM mapping을 찾습니다.
+1. [`bus_monitor/models.py`](../../bus_monitor/models.py)에서 Domain 결과와 상태를 읽습니다.
+2. [`bus_monitor/db_models.py`](../../bus_monitor/db_models.py)에서 ORM table·FK·nullable·index를 읽습니다.
+3. [`bus_monitor/storage.py`](../../bus_monitor/storage.py)의 `save_snapshot()`에서 domain → ORM mapping을 찾습니다.
 4. `database/base.py`에서 `Base.metadata` 등록 지점을 확인합니다.
 5. `database/session.py`에서 `SessionLocal` factory 설정을 읽습니다.
 6. `alembic/env.py`에서 모든 ORM model을 import해 metadata를 등록하는 이유를 확인합니다.
@@ -289,4 +289,4 @@ kst = collected_at.astimezone(ZoneInfo("Asia/Seoul"))
 
 ## 다음 읽기
 
-[Database Learning](../database/database_learning.md)에서 Engine·Session·SQL·Alembic의 세부 동작을, [Database Architecture](../database/database_architecture.md)에서 실제 table 관계와 운영 migration 구조를 읽습니다.
+[Relational Database Design](relational-database-design.md)을 먼저 읽었다면, [Database Learning](../database/database_learning.md)에서 Engine·Session·SQL·Alembic의 세부 동작을, [Database Architecture](../database/database_architecture.md)에서 실제 table 관계와 운영 migration 구조를 읽습니다.

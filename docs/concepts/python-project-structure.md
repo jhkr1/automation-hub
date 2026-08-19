@@ -227,7 +227,7 @@ bus_monitor/
 2. `.venv/bin/pip`로 설치했는데 system Python으로 실행하면 어떤 문제가 생길 수 있나요?
 3. `PYTHONPATH`를 추가하는 것과 package를 editable install하는 것은 왜 같은 해결책이 아닌가요?
 4. `pyproject.toml`의 package discovery에 `bus_monitor*`가 빠지면 어떤 상황이 생길 수 있나요?
-5. `run_dashboard.sh`가 애플리케이션 내부에 `sys.path.insert()`를 넣지 않고 wrapper에서 root를 설정하는 이유는 무엇인가요?
+5. [`run_dashboard.sh`](../../run_dashboard.sh)가 애플리케이션 내부에 `sys.path.insert()`를 넣지 않고 wrapper에서 root를 설정하는 이유는 무엇인가요?
 
 ## 다음 읽기
 

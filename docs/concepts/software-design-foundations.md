@@ -70,7 +70,7 @@ Abstraction은 불필요한 세부사항을 숨기고 현재 사용자가 필요
 
 ## 7. automation-hub에서는?
 
-Bus Monitor의 실제 구조는 다음처럼 책임이 나뉩니다.
+Bus Monitor의 실제 구조는 다음처럼 책임이 나뉩니다. 대표 구현은 [`bus_monitor/main.py`](../../bus_monitor/main.py), [`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py), [`bus_monitor/storage.py`](../../bus_monitor/storage.py)에서 확인할 수 있습니다.
 
 ```text
 bus_monitor/main.py

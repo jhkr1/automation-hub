@@ -186,11 +186,11 @@ table이 필요하다.
 
 ## 14. 실제 코드 읽는 순서
 
-1. `bus_monitor/db_models.py`: table, PK, FK, nullable, relationship, index, constraint
-2. `alembic/versions/0004_create_bus_monitor_snapshots_tables.py`: 실제 생성 계약과 ondelete
-3. `bus_monitor/storage.py`: transaction 경계와 저장 순서
-4. `automation_dashboard/queries/bus_monitor.py`: read query와 화면용 변환
-5. `tests/database/test_bus_monitor_integration.py`: 실제 DB 계약과 실패 사례
+1. [`bus_monitor/db_models.py`](../../bus_monitor/db_models.py): table, PK, FK, nullable, relationship, index, constraint
+2. [`alembic/versions/0004_create_bus_monitor_snapshots_tables.py`](../../alembic/versions/0004_create_bus_monitor_snapshots_tables.py): 실제 생성 계약과 ondelete
+3. [`bus_monitor/storage.py`](../../bus_monitor/storage.py): transaction 경계와 저장 순서
+4. [`automation_dashboard/queries/bus_monitor.py`](../../automation_dashboard/queries/bus_monitor.py): read query와 화면용 변환
+5. [`tests/database/test_bus_monitor_integration.py`](../../tests/database/test_bus_monitor_integration.py): 실제 DB 계약과 실패 사례
 
 읽을 때 “이 column은 어떤 query를 위해 존재하는가?”, “이 제약이 막는 잘못은 무엇인가?”를
 각각 적어 본다.

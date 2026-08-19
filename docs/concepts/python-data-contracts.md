@@ -191,11 +191,11 @@ class RealtimeArrival:
 ## 7. 실제 코드를 읽는 방법
 
 1. `bus_monitor/odsay.py`와 `bus_monitor/gyeonggi.py`에서 외부 응답을 읽는 Provider를 찾습니다.
-2. 반환 타입 또는 생성되는 model이 `bus_monitor/models.py`의 어떤 class인지 확인합니다.
+2. 반환 타입 또는 생성되는 model이 [`bus_monitor/models.py`](../../bus_monitor/models.py)의 어떤 class인지 확인합니다.
 3. `RealtimeArrival.__post_init__()`에서 필수 값과 non-negative 검증을 읽습니다.
-4. `bus_monitor/pipeline.py`에서 `TransitRoute`, `BusLeg`, `RealtimeArrival`이 어떻게 조합되는지 확인합니다.
-5. `bus_monitor/storage.py`와 `bus_monitor/db_models.py`에서 domain model이 저장 model로 변환되는 경계를 확인합니다.
-6. `automation_dashboard/queries/bus_monitor.py`에서 저장된 값이 화면용 DTO로 바뀌는 흐름을 확인합니다.
+4. [`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py)에서 `TransitRoute`, `BusLeg`, `RealtimeArrival`이 어떻게 조합되는지 확인합니다.
+5. [`bus_monitor/storage.py`](../../bus_monitor/storage.py)와 [`bus_monitor/db_models.py`](../../bus_monitor/db_models.py)에서 domain model이 저장 model로 변환되는 경계를 확인합니다.
+6. [`automation_dashboard/queries/bus_monitor.py`](../../automation_dashboard/queries/bus_monitor.py)에서 저장된 값이 화면용 DTO로 바뀌는 흐름을 확인합니다.
 
 ## 8. 장점과 단점
 
@@ -233,4 +233,4 @@ class RealtimeArrival:
 
 ## 다음 읽기
 
-[STUDY_NOTE](../learning/STUDY_NOTE.md)의 Chapter 6에서 데이터 계약을 지키지 못했을 때 Exception과 Logging 경계를 읽습니다.
+[Domain and Persistence Models](domain-and-persistence-models.md)에서 Domain·DTO·ORM 경계를 읽은 뒤, [STUDY_NOTE](../learning/STUDY_NOTE.md)의 Chapter 6에서 Exception과 Logging 경계를 읽습니다.

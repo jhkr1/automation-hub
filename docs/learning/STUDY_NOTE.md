@@ -159,6 +159,7 @@ Python 문법을 업무 자동화 프로젝트의 유지보수 가능한 코드�
 - 학습 목표: KISS, YAGNI, SOLID, Rule of Three를 현재 규모에 적용함
 - 예상 읽기 시간: 35분
 - 연결 코드: 전체 `namuwiki_trend/`, `AGENTS.md`
+- 관련 Concept: [Software Design Foundations](../concepts/software-design-foundations.md)
 
 ---
 
@@ -404,6 +405,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 학습 목표: rank, order, schema와 불변성을 테스트로 보존함
 - 예상 읽기 시간: 35분
 - 연결 코드: `extraction.py`, `csv_storage.py`, `insight_storage.py`
+- 관련 Concept: [Python Data Contracts](../concepts/python-data-contracts.md)
 
 ---
 
@@ -475,12 +477,14 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 난이도: 초급~중급
 - 핵심 질문: 왜 독립 패키지와 flat layout으로 시작했는가
 - 연결 코드: `pyproject.toml`, `namuwiki_trend/config.py`, `models.py`
+- 관련 Concept: [Python Project Structure](../concepts/python-project-structure.md)
 
 ## Chapter 37. Sprint 2 — Playwright 선택과 DOM 검증
 
 - 난이도: 중급
 - 핵심 질문: 왜 requests·BeautifulSoup 대신 브라우저 렌더링을 검증했는가
 - 연결 코드: `collector.py`, `extraction.py`, `playwright_poc.py`
+- 관련 Concept: [Web, DOM and Browser Automation](../concepts/web-dom-browser-automation.md)
 
 ## Chapter 38. Sprint 3 — RSS와 Gemini Enrichment
 
@@ -493,6 +497,7 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 난이도: 중급
 - 핵심 질문: 단일 Item을 Top10 Application으로 연결하고 결과를 어떻게 보존했는가
 - 연결 코드: `pipeline.py`, `insight_storage.py`, `main.py`
+- 관련 Concept: [Pipeline, Provider and Storage](../concepts/pipeline-provider-storage.md)
 
 ## Chapter 40. Sprint 5 — Rate Limiting과 Retry
 
@@ -520,18 +525,21 @@ Part 2의 책임 분리와 Application Layer를 데이터 영속화·조회 문�
 - 핵심 질문: 왜 원본 순위 데이터를 append-only DB snapshot으로 보존했는가
 - 연결 코드: `database/models.py`, `alembic/`, `database/snapshot_save_service.py`,
   `namuwiki_trend/snapshot_main.py`
+- 관련 Concept: [SQLAlchemy Session, Transaction and Migration](../concepts/sqlalchemy-session-transaction-migration.md)
 
 ## Chapter 44. Sprint 9 — Daily Trend Query
 
 - 상태: 조회 서비스 구현 완료, 집계 결과 저장과 전용 CLI는 미구현
 - 핵심 질문: KST 업무 날짜의 반복 출현과 순위를 어떻게 SQL로 요약하는가
 - 연결 코드: `database/daily_trend_query.py`, `tests/database/test_daily_trend_query.py`
+- 관련 Concept: [Relational Database Design](../concepts/relational-database-design.md)
 
 ## Chapter 45. 전체 회고 — 설계·검증·운영의 연결
 
 - 난이도: 종합
 - 핵심 질문: 각 Sprint의 Evidence가 다음 설계 결정을 어떻게 제한하고 개선했는가
 - 연결 코드: 전체 패키지, Git history, 문서와 로그
+- 관련 문서: [Architecture Handbook](../handbook/README.md), [Root Architecture](../architecture.md), [Codebase Guide](../../CODEBASE_GUIDE.md)
 
 ---
 

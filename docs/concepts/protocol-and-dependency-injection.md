@@ -114,7 +114,7 @@ DIP는 원칙이고 DI는 그 원칙을 실현하는 방법 중 하나입니다.
 
 그렇다면 실제 구현체는 누가 만들고 연결할까요? 실행을 시작하는 경계, 즉 Composition Root가 담당합니다.
 
-현재 Bus Monitor에서는 `bus_monitor/main.py`의 실제 함수가 이 역할을 합니다.
+현재 Bus Monitor에서는 [`bus_monitor/main.py`](../../bus_monitor/main.py)의 실제 함수가 이 역할을 합니다.
 
 ```python
 def build_pipeline(settings: BusMonitorSettings | None = None) -> BusMonitorPipeline:
@@ -140,7 +140,7 @@ BusMonitorPipeline          ← 두 Provider를 생성자로 주입받음
 main.build_pipeline()       ← production 구현체를 조립
 ```
 
-`bus_monitor/pipeline.py`의 `RouteProvider`는 `search_route()`를, `RealtimeProvider`는 `get_station_routes()`와 `get_arrivals()`를 요구합니다. 테스트는 이 method를 제공하는 작은 Fake를 주입할 수 있습니다.
+[`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py)의 `RouteProvider`는 `search_route()`를, `RealtimeProvider`는 `get_station_routes()`와 `get_arrivals()`를 요구합니다. 테스트는 이 method를 제공하는 작은 Fake를 주입할 수 있습니다.
 
 다른 package에도 Protocol이 실제로 있습니다. `namuwiki_trend/pipeline.py`의 `TrendEnricherProtocol`, `namuwiki_trend/enricher.py`의 `NewsProvider`와 `ReasonGenerator`, `google_finance/analysis_application.py`의 `StockNewsProvider`와 Generator 계약이 예입니다. 모든 협력자에 Protocol을 만든 것이 아니라 교체·테스트 경계가 필요한 곳에 사용했습니다.
 

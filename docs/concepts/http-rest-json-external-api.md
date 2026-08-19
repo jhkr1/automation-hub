@@ -208,12 +208,12 @@ Monitor를 주 사례로 삼는다.
 
 ## 12. 실제 코드를 읽는 순서
 
-1. `bus_monitor/config.py`: 어떤 credential과 설정이 필요한가?
-2. `bus_monitor/odsay.py`: endpoint, params, timeout, JSON path, 예외
-3. `bus_monitor/gyeonggi.py`: 공통 envelope, result code, list/object/empty 처리
-4. `bus_monitor/models.py`: 외부 field가 어떤 내부 타입이 되는가?
-5. `bus_monitor/pipeline.py`: Provider 결과를 어떤 순서로 조합하는가?
-6. `tests/bus_monitor/`: fake response로 성공·빈 결과·잘못된 JSON을 어떻게 검증하는가?
+1. [`bus_monitor/config.py`](../../bus_monitor/config.py): 어떤 credential과 설정이 필요한가?
+2. [`bus_monitor/odsay.py`](../../bus_monitor/odsay.py): endpoint, params, timeout, JSON path, 예외
+3. [`bus_monitor/gyeonggi.py`](../../bus_monitor/gyeonggi.py): 공통 envelope, result code, list/object/empty 처리
+4. [`bus_monitor/models.py`](../../bus_monitor/models.py): 외부 field가 어떤 내부 타입이 되는가?
+5. [`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py): Provider 결과를 어떤 순서로 조합하는가?
+6. [`tests/bus_monitor/`](../../tests/bus_monitor/): fake response로 성공·빈 결과·잘못된 JSON을 어떻게 검증하는가?
 
 각 파일에서 “HTTP 세부사항이 어디에서 끝나는가?”와 “Domain invariant가 어디에서 시작하는가?”를
 표시해 본다. 실제 API key나 전체 response를 테스트 fixture에 넣지 않는다.
@@ -249,3 +249,4 @@ JSON 구조를 몰라도 이 Domain Model만 조합합니다. API key는 환경�
 - [Pipeline, Provider and Storage](pipeline-provider-storage.md)
 - [Python Data Contracts](python-data-contracts.md)
 - [Web Crawling과 DOM](../learning/STUDY_NOTE.md#chapter-14-html-dom-view-source)
+- [Web, DOM and Browser Automation](web-dom-browser-automation.md)

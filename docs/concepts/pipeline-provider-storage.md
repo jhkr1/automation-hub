@@ -126,12 +126,12 @@ Namuwiki는 `TrendPipeline.run()`이 `collect_trends`와 `TrendEnricher`를 연�
 
 ### Bus Monitor
 
-1. `bus_monitor/main.py`의 `build_pipeline()`을 엽니다.
+1. [`bus_monitor/main.py`](../../bus_monitor/main.py)의 `build_pipeline()`을 엽니다.
 2. 생성자 인자인 `OdsayRouteProvider`, `GyeonggiProvider`를 확인합니다.
-3. `bus_monitor/pipeline.py`에서 `RouteProvider`, `RealtimeProvider` Protocol을 찾습니다.
+3. [`bus_monitor/pipeline.py`](../../bus_monitor/pipeline.py)에서 `RouteProvider`, `RealtimeProvider` Protocol을 찾습니다.
 4. `BusMonitorPipeline.run()`의 호출 순서와 상태 분기를 읽습니다.
-5. `bus_monitor/models.py`에서 `TransitRoute`, `RealtimeArrival`, `BusRouteResult`를 확인합니다.
-6. `bus_monitor/storage.py`의 `save_snapshot()`으로 결과가 전달되는 지점을 찾습니다.
+5. [`bus_monitor/models.py`](../../bus_monitor/models.py)에서 `TransitRoute`, `RealtimeArrival`, `BusRouteResult`를 확인합니다.
+6. [`bus_monitor/storage.py`](../../bus_monitor/storage.py)의 `save_snapshot()`으로 결과가 전달되는 지점을 찾습니다.
 
 ### Google Finance
 
